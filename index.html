@@ -613,19 +613,35 @@ async function pkce() {
 }
 const iosStandalone = () => window.navigator.standalone === true;
 async function entrarDropbox(modoCodigo) {
+  if (modoCodigo || iosStandalone()) { await prepararCodigo(); return }
   const { v, c } = await pkce();
   localStorage.setItem(DBX_VER, v);
   const p = new URLSearchParams({ client_id: DBX_APP_KEY, response_type: 'code', code_challenge: c, code_challenge_method: 'S256', token_access_type: 'offline' });
-  if (modoCodigo || iosStandalone()) {
-    window.open('https://www.dropbox.com/oauth2/authorize?' + p, '_blank');
-    setTimeout(() => {
-      const code = prompt('Depois de autorizar, o Dropbox mostra um CÓDIGO. Copie e cole aqui:');
-      if (code && code.trim()) trocarCodigo(code.trim(), false);
-    }, 600);
-    return;
-  }
   p.set('redirect_uri', REDIRECT);
   location.href = 'https://www.dropbox.com/oauth2/authorize?' + p;
+}
+/* Modo código (iPhone): link real para tocar + campo na própria tela. O link fica guardado,
+   para sobreviver se o iPhone recarregar o app enquanto a pessoa está no Safari. */
+const DBX_URL = 'erms_dbx_url';
+async function prepararCodigo(novo) {
+  let url = localStorage.getItem(DBX_URL);
+  if (novo || !url || !localStorage.getItem(DBX_VER)) {
+    const { v, c } = await pkce();
+    localStorage.setItem(DBX_VER, v);
+    url = 'https://www.dropbox.com/oauth2/authorize?' + new URLSearchParams({ client_id: DBX_APP_KEY, response_type: 'code', code_challenge: c, code_challenge_method: 'S256', token_access_type: 'offline' });
+    localStorage.setItem(DBX_URL, url);
+  }
+  const m = $('#main'); if (!m) return;
+  m.innerHTML = telaCodigo(url);
+}
+function telaCodigo(url) {
+  return `<div style="max-width:460px;margin:40px auto"><div class="card"><h2>Entrar com código</h2>
+  <p><b>1.</b> Toque no botão abaixo. O Dropbox abre; entre na sua conta e toque em <b>Permitir</b>.</p>
+  <a class="btn big" style="display:block;text-align:center;padding:12px;background:#0f1e3a;color:#f3e7cf;border-radius:10px;text-decoration:none" href="${url}" target="_blank" rel="noopener">Abrir o Dropbox</a>
+  <p style="margin-top:16px"><b>2.</b> O Dropbox mostra um código. Copie (toque e segure → Copiar), volte para o ERMS e cole aqui:</p>
+  <input id="dbxcod" placeholder="cole o código aqui" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;font-size:18px;padding:10px;box-sizing:border-box">
+  <button class="big pri" style="width:100%;margin-top:10px;padding:12px" onclick="const c=$('#dbxcod').value.trim(); if(c) trocarCodigo(c,false); else alert('Cole o código primeiro.')">Conectar</button>
+  <p class="sub" style="margin-top:12px">Se der erro, <a href="javascript:prepararCodigo(true)">gerar um novo link</a> e repetir.</p></div></div>`;
 }
 async function trocarCodigo(code, comRedirect) {
   const body = new URLSearchParams({ code, grant_type: 'authorization_code', client_id: DBX_APP_KEY, code_verifier: localStorage.getItem(DBX_VER) || '' });
@@ -636,9 +652,10 @@ async function trocarCodigo(code, comRedirect) {
     if (!r.ok || !j.access_token) throw new Error(j.error_description || j.error || ('HTTP ' + r.status));
     dbx = { refresh: j.refresh_token, access: j.access_token, exp: Date.now() + (j.expires_in - 60) * 1000, conta: j.account_id };
     localStorage.setItem(DBX_TOK, JSON.stringify(dbx));
-    localStorage.removeItem(DBX_VER);
+    localStorage.removeItem(DBX_VER); localStorage.removeItem(DBX_URL);
     toast('Dropbox conectado. Sincronizando…');
     await sincronizar(true);
+    render();
   } catch (e) { alert('Não foi possível conectar ao Dropbox: ' + e.message) }
 }
 async function tokenValido() {
@@ -816,7 +833,7 @@ async function initDropbox() {
 function setFstat() { mostrarSync() }
 const _renderOrig = render;
 render = function () {
-  if (!dbx && !db.processos.length) { renderNav('painel'); $('#main').innerHTML = telaEntrada(); mostrarSync(); return }
+  if (!dbx && !db.processos.length) { renderNav('painel'); $('#main').innerHTML = localStorage.getItem('erms_dbx_url') ? telaCodigo(localStorage.getItem('erms_dbx_url')) : telaEntrada(); mostrarSync(); return }
   _renderOrig(); mostrarSync();
 };
 backupBanner = function () {
