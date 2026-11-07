@@ -863,7 +863,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 07/11 10:06</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -884,7 +884,21 @@ apagarTudo = function () {
 };
 const _saveOrig = save;
 save = function () { _saveOrig(); agendarSync() };
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  const tinhaControle = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    // ao voltar para o app (o iPhone costuma só "acordar" o app, sem reabrir), procura versão nova
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => { }) });
+    setInterval(() => reg.update().catch(() => { }), 30 * 60 * 1000);
+  }).catch(() => { });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!tinhaControle || document.getElementById('novaVersao')) return;
+    const d = document.createElement('div'); d.id = 'novaVersao';
+    d.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:90px;z-index:9999;background:#0f1e3a;color:#f3e7cf;padding:12px 16px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-size:15px';
+    d.innerHTML = 'Nova versão do ERMS disponível. <button style="margin-left:8px" onclick="location.reload()">Atualizar</button>';
+    document.body.appendChild(d);
+  });
+}
 
 render();initDropbox();
 </script>
