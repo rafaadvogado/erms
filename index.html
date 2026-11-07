@@ -786,9 +786,17 @@ async function sincronizar(forcarRender) {
 async function backupDiario(texto) {
   const hoje = todayStr();
   if (localStorage.getItem('erms_bk') === hoje) return;
+  if (!db.processos.length && !db.pessoas.length) return;   // nunca guardar cópia vazia
+  const cam = '/backups/dados-' + hoje + '.json';
   try {
-    await dbxEnviar('/backups/dados-' + hoje + '.json', texto, null);
-  } catch (e) { if (e.code !== 409) return }   // 409 = já existe cópia de hoje (outro aparelho)
+    await dbxEnviar(cam, texto, null);
+  } catch (e) {
+    if (e.code !== 409) return;   // 409 = já existe cópia de hoje (outro aparelho)
+    try {   // se a cópia de hoje estiver vazia (aparelho ainda sem dados), substitui
+      const m = await dbxApi('files/get_metadata', { path: cam });
+      if (m.size < 2000) await dbxEnviar(cam, texto, m.rev); else { }
+    } catch (e2) { return }
+  }
   localStorage.setItem('erms_bk', hoje);
   try {
     const j = await dbxApi('files/list_folder', { path: '/backups' });
