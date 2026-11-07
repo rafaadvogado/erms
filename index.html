@@ -597,7 +597,7 @@ function apagarTudo(){if(bloqueado())return;if(!confirm('Apagar TODOS os dados d
      /backups/dados-AAAA-MM-DD.json  cópia diária (mantém 30)
    Mescla por registro: cada registro tem _m (data da última alteração);
    exclusões ficam em db.excluidos {id: data}. */
-const DBX_APP_KEY = '__DROPBOX_APP_KEY__';
+const DBX_APP_KEY = 'h4lwztmql1yrikv';
 const DBX_TOK = 'erms_dbx_token', DBX_VER = 'erms_dbx_verifier';
 const REDIRECT = location.origin + location.pathname;
 let dbx = (() => { try { return JSON.parse(localStorage.getItem(DBX_TOK)) || null } catch (e) { return null } })();
