@@ -863,7 +863,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 07/11 10:06</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 07/11 12:07</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -898,6 +898,223 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
     d.innerHTML = 'Nova versão do ERMS disponível. <button style="margin-left:8px" onclick="location.reload()">Atualizar</button>';
     document.body.appendChild(d);
   });
+}
+
+/* ================= ERMS – preencher Lead / Prazo com IA (API do Claude) =================
+   A chave da API fica só neste aparelho (localStorage), nunca no código publicado.
+   A IA só extrai as informações; a DATA FINAL de prazo é calculada pelo próprio ERMS
+   (dias úteis, feriados, recesso), e nada é salvo sem o advogado conferir e tocar em Salvar. */
+const IA_KEY = 'erms_claude_key', IA_MODELO = 'claude-sonnet-5-5';
+const iaChave = () => { try { return localStorage.getItem(IA_KEY) || '' } catch (e) { return '' } };
+
+/* ---------- contagem de prazos (igual à da automação) ---------- */
+const FER_NAC = new Set(['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-11-20', '2026-12-25',
+  '2027-01-01', '2027-02-08', '2027-02-09', '2027-03-26', '2027-04-21', '2027-05-01', '2027-05-27', '2027-09-07', '2027-10-12', '2027-11-02', '2027-11-15', '2027-11-20', '2027-12-25',
+  '2028-01-01', '2028-02-28', '2028-02-29', '2028-04-14', '2028-04-21', '2028-05-01', '2028-06-15', '2028-09-07', '2028-10-12', '2028-11-02', '2028-11-15', '2028-11-20', '2028-12-25']);
+const FER_JF = new Set(['2026-04-01', '2026-04-02', '2026-08-11', '2026-11-01', '2026-12-08', '2027-03-24', '2027-03-25', '2027-08-11', '2027-11-01', '2027-12-08', '2028-04-12', '2028-04-13', '2028-08-11', '2028-11-01', '2028-12-08']);
+const FER_SP = new Set(['2026-07-09', '2026-04-02', '2027-07-09', '2027-03-25', '2028-07-09', '2028-04-13']);
+const isoD = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const parseD = s => { const [a, m, d] = s.split('-').map(Number); return new Date(a, m - 1, d, 12) };
+function diaUtil(d, j) {
+  const s = isoD(d), w = d.getDay(), md = (d.getMonth() + 1) * 100 + d.getDate();
+  if (w === 0 || w === 6 || FER_NAC.has(s)) return false;
+  if (j === 'federal' && FER_JF.has(s)) return false;
+  if (j === 'estadual' && FER_SP.has(s)) return false;
+  if (md >= 1220 || md <= 120) return false;   // recesso / suspensão (CPC 220)
+  return true;
+}
+function proxUtil(d, j) { d = new Date(d); do { d.setDate(d.getDate() + 1) } while (!diaUtil(d, j)); return d }
+function prazoFinal(pub, n, j) { let d = parseD(pub); for (let i = 0; i < n; i++) d = proxUtil(d, j); return isoD(d) }
+function justicaNum(n) { const m = String(n || '').replace(/\D/g, ''); const j = m.length === 20 ? m[13] : ''; return { 4: 'federal', 5: 'trabalho', 8: 'estadual' }[j] || '' }
+
+/* ---------- imagens: reduz antes de enviar ---------- */
+function lerImagem(f) {
+  return new Promise((ok, erro) => {
+    const r = new FileReader(); r.onerror = () => erro(new Error('não consegui ler a imagem'));
+    r.onload = () => {
+      const img = new Image(); img.onerror = () => erro(new Error('formato de imagem não suportado'));
+      img.onload = () => {
+        const max = 1800, k = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        ok(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      };
+      img.src = r.result;
+    };
+    r.readAsDataURL(f);
+  });
+}
+
+/* ---------- ferramentas (saída estruturada) ---------- */
+const IA_TOOLS = {
+  prazos: {
+    name: 'lancar_prazo', description: 'Registra no ERMS um prazo processual ou compromisso extraído do material enviado.',
+    input_schema: {
+      type: 'object', properties: {
+        tipo: { type: 'string', enum: ['Prazo', 'Audiência', 'Perícia', 'Reunião', 'Tarefa', 'Diligência'] },
+        titulo: { type: 'string', description: 'Descrição curta e clara do que precisa ser feito (ex.: "Recurso inominado contra a sentença", "Audiência de conciliação").' },
+        numero_processo: { type: 'string', description: 'Número CNJ do processo, se aparecer (formato NNNNNNN-DD.AAAA.J.TR.OOOO). Vazio se não houver.' },
+        cliente: { type: 'string', description: 'Nome do cliente do advogado (a parte que ele representa), se identificável.' },
+        data_disponibilizacao: { type: 'string', description: 'AAAA-MM-DD. Data de disponibilização no Diário (DJEN/DJe), se informada.' },
+        data_publicacao: { type: 'string', description: 'AAAA-MM-DD. Data de publicação ou de ciência/intimação, se informada.' },
+        dias_uteis: { type: 'integer', description: 'Quantidade de dias úteis do prazo: o fixado pelo juiz no ato ou, se não houver, o prazo legal do ato. 0 se não for prazo contado.' },
+        justica: { type: 'string', enum: ['federal', 'estadual', 'trabalho', ''], description: 'Ramo da Justiça (pelo número do processo ou pelo órgão).' },
+        data: { type: 'string', description: 'AAAA-MM-DD. Para audiência, perícia, reunião, tarefa ou prazo com data final expressa no texto. Vazio para prazo a ser contado.' },
+        hora: { type: 'string', description: 'HH:MM, se houver.' },
+        local: { type: 'string', description: 'Local, sala, endereço ou link, se houver.' },
+        obs: { type: 'string', description: 'Resumo fiel do ato/decisão, fundamento do prazo e, para audiência/perícia, o que o cliente deve levar. Em português.' },
+        alertas: { type: 'string', description: 'Dúvidas ou pontos que o advogado precisa conferir (ex.: data de publicação não aparece, prazo ambíguo). Vazio se nenhum.' }
+      }, required: ['tipo', 'titulo', 'obs']
+    }
+  },
+  leads: {
+    name: 'lancar_lead', description: 'Registra no ERMS um potencial cliente (lead) extraído do material enviado.',
+    input_schema: {
+      type: 'object', properties: {
+        nome: { type: 'string', description: 'Nome da pessoa. Se não aparecer, use o nome do contato do WhatsApp ou "(sem nome)".' },
+        telefone: { type: 'string', description: 'Telefone/WhatsApp com DDD, se aparecer.' },
+        email: { type: 'string' },
+        origem: { type: 'string', enum: [...OPT.origem, ''] },
+        area: { type: 'string', enum: [...OPT.area, ''] },
+        assunto: { type: 'string', description: 'O problema ou pedido da pessoa, resumido de forma fiel em 1 a 3 frases.' },
+        proximo_contato: { type: 'string', description: 'AAAA-MM-DD, se o material indicar quando retornar. Vazio se não indicar.' },
+        valor: { type: 'number', description: 'Honorários estimados, só se o material mencionar valor.' },
+        obs: { type: 'string', description: 'Outras informações úteis: benefícios, datas, documentos citados, cidade, etc.' },
+        alertas: { type: 'string', description: 'O que o advogado deve conferir. Vazio se nenhum.' }
+      }, required: ['nome', 'assunto']
+    }
+  }
+};
+function iaSistema(col) {
+  const hoje = todayStr(), dia = new Date().toLocaleDateString('pt-BR', { weekday: 'long' });
+  const base = `Você é o assistente do ERMS, sistema do escritório do advogado Rafael de Mello Souza (OAB/SP 352.797, Bauru-SP; atua principalmente em Previdenciário, Cível e Trabalhista). Hoje é ${dia}, ${hoje}. Leia o texto e/ou as imagens (prints de WhatsApp, intimações, e-mails, PDFs fotografados) e chame a ferramenta com os dados. Seja fiel ao material: não invente nomes, números, datas ou conteúdo de decisões. Datas sem ano: use o ano mais provável perto de hoje. Escreva em português do Brasil.`;
+  if (col === 'leads') return base + ` Trata-se de um NOVO CONTATO (lead). Mensagem recebida por WhatsApp → origem "WhatsApp", salvo se o texto indicar outra (indicação, Instagram...). Classifique a área pelo assunto (ex.: LOAS, aposentadoria, auxílio-doença, BPC → Previdenciário).`;
+  return base + ` Trata-se de um PRAZO ou COMPROMISSO. Regras:
+- Intimação/publicação com prazo a contar: tipo "Prazo", "data" vazia, informe data_disponibilizacao e/ou data_publicacao e dias_uteis; o ERMS calcula a data final. Use o prazo fixado no ato; se não houver, o legal: recurso inominado (JEF/JEC) 10; apelação, agravo de instrumento, contrarrazões, contestação/réplica e manifestação sobre laudo 15; embargos de declaração 5; ato sem prazo expresso 5 (CPC 218 §3º); Justiça do Trabalho: recurso ordinário e contrarrazões 8, embargos 5. Prazos do processo eletrônico em dias úteis.
+- Se o material trouxer a data final expressa ("até 20/11"), preencha "data" com ela.
+- Audiência, perícia, reunião: tipo correspondente, data e hora do ato, local e o que o cliente deve levar nos obs.
+- Intimação pelo portal sem data de ciência clara: deixe data_publicacao vazia e explique em alertas.
+- Em obs, explique a contagem (ato, publicação, fundamento) de forma objetiva.`;
+}
+
+async function iaChamar(col, texto, imagens) {
+  const chave = iaChave(); if (!chave) throw new Error('Cadastre a chave da API do Claude em Backup e ajustes.');
+  const content = imagens.map(b => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b } }));
+  content.push({ type: 'text', text: (texto || '').trim() || '(sem texto; use as imagens)' });
+  const tool = IA_TOOLS[col];
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: IA_MODELO, max_tokens: 2000, system: iaSistema(col), tools: [tool], tool_choice: { type: 'tool', name: tool.name }, messages: [{ role: 'user', content }] })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const m = (j.error && j.error.message) || ('HTTP ' + r.status);
+    if (r.status === 401) throw new Error('chave da API inválida. Confira em Backup e ajustes.');
+    if (/credit|balance/i.test(m)) throw new Error('sem créditos na conta da API (console.anthropic.com → Billing).');
+    throw new Error(m);
+  }
+  const u = (j.content || []).find(c => c.type === 'tool_use');
+  if (!u) throw new Error('a IA não devolveu os dados. Tente de novo.');
+  return u.input;
+}
+
+/* ---------- localizar processo / cliente no ERMS ---------- */
+function iaAcharProcesso(numero) {
+  const d = String(numero || '').replace(/\D/g, ''); if (d.length < 15) return null;
+  return db.processos.find(p => String(p.numero || '').replace(/\D/g, '') === d) || null;
+}
+function iaAcharPessoa(nome) {
+  const n = norm(nome).trim(); if (n.length < 4) return null;
+  const ex = db.pessoas.filter(p => norm(p.nome) === n); if (ex.length === 1) return ex[0];
+  const c = db.pessoas.filter(p => norm(p.nome).includes(n) || (n.includes(norm(p.nome)) && norm(p.nome).length > 8));
+  return c.length === 1 ? c[0] : null;
+}
+
+function iaMontar(col, x) {
+  const avisos = [], rec = {};
+  if (x.alertas) avisos.push(x.alertas);
+  if (col === 'leads') {
+    Object.assign(rec, { nome: x.nome || '', telefone: x.telefone || '', email: x.email || '', origem: x.origem || '', area: x.area || '', assunto: x.assunto || '', etapa: 'Novo', obs: x.obs || '' });
+    if (x.proximo_contato) rec.proximoContato = x.proximo_contato;
+    if (x.valor) rec.valor = x.valor;
+    const tel = String(x.telefone || '').replace(/\D/g, '').slice(-8);
+    const ja = tel && [...db.leads, ...db.pessoas].find(p => String(p.telefone || '').replace(/\D/g, '').slice(-8) === tel);
+    const jaNome = !ja && iaAcharPessoa(x.nome);
+    if (ja || jaNome) avisos.push(`Já existe no ERMS alguém com ${ja ? 'este telefone' : 'este nome'}: ${(ja || jaNome).nome}. Confira se não é duplicado${db.pessoas.includes(ja || jaNome) ? ' (é cliente cadastrado)' : ''}.`);
+    return { rec, avisos };
+  }
+  const proc = iaAcharProcesso(x.numero_processo);
+  const pes = proc ? byId('pessoas', proc.clienteId) : iaAcharPessoa(x.cliente);
+  if (x.numero_processo && !proc) avisos.push(`O processo ${x.numero_processo} não está cadastrado no ERMS.`);
+  if (!proc && x.cliente && !pes) avisos.push(`Não encontrei o cliente "${x.cliente}" no ERMS: escolha no campo Cliente.`);
+  Object.assign(rec, { tipo: x.tipo || 'Prazo', titulo: x.titulo || '', hora: x.hora || '', local: x.local || '', processoId: proc ? proc.id : '', pessoaId: pes ? pes.id : '', obs: x.obs || '' });
+  let contagem = '';
+  if (x.data) rec.data = x.data;
+  else if (x.dias_uteis > 0 && (x.data_publicacao || x.data_disponibilizacao)) {
+    const j = x.justica || justicaNum(proc ? proc.numero : x.numero_processo) || 'federal';
+    const pub = x.data_publicacao || isoD(proxUtil(parseD(x.data_disponibilizacao), j));
+    rec.data = prazoFinal(pub, x.dias_uteis, j);
+    contagem = `Contagem do ERMS: ${x.data_disponibilizacao ? 'disponibilizado em ' + fd(x.data_disponibilizacao) + ', ' : ''}publicação/ciência em ${fd(pub)}; início em ${fd(isoD(proxUtil(parseD(pub), j)))}; ${x.dias_uteis} dias úteis (Justiça ${j}, feriados nacionais${j === 'federal' ? ', da Justiça Federal' : j === 'estadual' ? ', de SP' : ''} e recesso de 20/12 a 20/01) → prazo final ${fd(rec.data)}. Feriados municipais da comarca não estão incluídos.`;
+  } else if (rec.tipo === 'Prazo') {
+    rec.data = todayStr(); avisos.push('Não deu para calcular a data final (falta a data de publicação ou o número de dias). Deixei HOJE: corrija a data.');
+  }
+  if (rec.tipo === 'Prazo' && !/^⚠/.test(rec.titulo)) rec.titulo = '⚠ conferir – ' + rec.titulo;
+  rec.obs = [rec.obs, contagem, 'Preenchido com IA – conferir antes de cumprir.'].filter(Boolean).join('\n\n');
+  return { rec, avisos };
+}
+
+/* ---------- caixa "Preencher com IA" nos formulários de Novo lead / Novo prazo ---------- */
+const _openFormBase = openForm;
+openForm = function (title, col, rec, opts = {}) {
+  _openFormBase(title, col, rec, opts);
+  if (!['leads', 'prazos'].includes(col) || (rec && rec.id)) return;
+  const frm = $('#frm'); if (!frm) return;
+  const box = document.createElement('div'); box.className = 'w2'; box.id = 'iabox';
+  box.style.cssText = 'grid-column:1/-1;background:#f3ecdf;border:1px solid #e2d6bf;border-radius:10px;padding:10px 12px;margin-bottom:4px';
+  box.innerHTML = opts.iaAvisos !== undefined
+    ? `<b>✨ Preenchido com IA – confira tudo antes de salvar.</b>${opts.iaAvisos.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + opts.iaAvisos.map(a => `<li>${esc(a)}</li>`).join('') + '</ul>' : ''}`
+    : `<b>✨ Preencher com IA</b> <span class="sub">– cole o texto e/ou envie prints; a IA preenche o formulário para você conferir.</span>
+      <textarea id="iaTxt" rows="3" style="width:100%;margin-top:6px;box-sizing:border-box" placeholder="${col === 'leads' ? 'Cole aqui a mensagem do WhatsApp, e-mail…' : 'Cole aqui a intimação, publicação, despacho…'}"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
+        <label class="btn" style="cursor:pointer">📷 Imagens / prints<input id="iaImg" type="file" accept="image/*" multiple style="display:none" onchange="$('#iaQt').textContent=this.files.length?this.files.length+' imagem(ns)':''"></label>
+        <span id="iaQt" class="sub"></span><span class="grow" style="flex:1"></span>
+        <button type="button" class="pri" id="iaBtn" onclick="iaPreencher('${col}')">✨ Preencher</button>
+      </div><div id="iaSt" class="sub" style="margin-top:4px"></div>`;
+  frm.insertBefore(box, frm.firstChild);
+};
+async function iaPreencher(col) {
+  const st = $('#iaSt'), bt = $('#iaBtn');
+  if (!iaChave()) { st.innerHTML = 'Primeiro cadastre a chave da API em <a href="#config" onclick="closeModal()">Backup e ajustes</a>.'; return }
+  const texto = $('#iaTxt').value, fs = [...($('#iaImg').files || [])].slice(0, 5);
+  if (!texto.trim() && !fs.length) { st.textContent = 'Cole um texto ou escolha uma imagem.'; return }
+  if (!navigator.onLine) { st.textContent = 'Sem internet: a IA precisa de conexão.'; return }
+  bt.disabled = true; st.textContent = '⏳ Lendo' + (fs.length ? ' as imagens' : '') + '…';
+  try {
+    const imgs = []; for (const f of fs) imgs.push(await lerImagem(f));
+    st.textContent = '⏳ A IA está analisando…';
+    const x = await iaChamar(col, texto, imgs);
+    const { rec, avisos } = iaMontar(col, x);
+    closeModal();
+    openForm(NOVO[col] + ' (IA)', col, rec, { iaAvisos: avisos });
+  } catch (e) { st.textContent = '⚠️ ' + e.message; bt.disabled = false }
+}
+
+/* ---------- ajustes: chave da API ---------- */
+const _cfgBase = VIEWS.config;
+VIEWS.config = () => _cfgBase() + `<div class="card"><h2>✨ IA (API do Claude)</h2>
+<p class="sub">Usada no botão "Preencher com IA" de Novo lead e Novo prazo. A chave fica guardada só neste aparelho (cadastre no celular e no computador). Crie em <b>console.anthropic.com</b> → API Keys.</p>
+${iaChave() ? `<p>Chave cadastrada: <b>…${esc(iaChave().slice(-6))}</b></p><div class="acts"><button onclick="iaTestar()">Testar</button><button onclick="if(confirm('Remover a chave deste aparelho?')){localStorage.removeItem(IA_KEY);render()}">Remover</button></div>`
+  : `<div class="acts"><input id="iaKeyIn" type="password" placeholder="sk-ant-…" autocomplete="off" style="flex:1;min-width:220px"><button class="pri" onclick="const v=$('#iaKeyIn').value.trim();if(!/^sk-ant-/.test(v)){alert('A chave começa com sk-ant-');return}localStorage.setItem(IA_KEY,v);render();iaTestar()">Salvar</button></div>`}
+<div id="iaTst" class="sub" style="margin-top:6px"></div></div>`;
+async function iaTestar() {
+  const o = $('#iaTst'); if (o) o.textContent = '⏳ testando…';
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': iaChave(), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: IA_MODELO, max_tokens: 5, messages: [{ role: 'user', content: 'Responda só: ok' }] }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(r.status === 401 ? 'chave inválida' : ((j.error && j.error.message) || 'HTTP ' + r.status));
+    if (o) o.innerHTML = '✅ Funcionando.';
+  } catch (e) { if (o) o.textContent = '⚠️ ' + e.message }
 }
 
 render();initDropbox();
