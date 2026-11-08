@@ -864,7 +864,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 08/11 19:21</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 08/11 19:46</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1125,7 +1125,7 @@ async function iaTestar() {
 /* ================= ERMS – Tráfego do site (rafaelmsouza.adv.br) =================
    Dados do Umami Cloud (estatística sem cookies, sem dados pessoais dos visitantes).
    O ID do site e a chave da API ficam só neste aparelho (localStorage). */
-const UM_ID = 'erms_umami_site', UM_KEY = 'erms_umami_key', UM_API = 'https://api.umami.is/v1';
+const UM_SHARE = 'erms_umami_share', UM_ID = 'erms_umami_site', UM_KEY = 'erms_umami_key', UM_API = 'https://api.umami.is/v1';
 const umGet = k => { try { return localStorage.getItem(k) || '' } catch (e) { return '' } };
 const EVENTOS = {
   'whatsapp': '💬 Cliques no WhatsApp', 'email': '✉️ Cliques no e-mail', 'salvar-contato': '👤 Salvaram o contato',
@@ -1156,13 +1156,18 @@ const barras = (itens, rot) => {
 const tabela = (lin, cab) => lin.length ? `<div class="tbl"><table><thead><tr>${cab.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${lin.map(l => `<tr>${l.map((c, i) => `<td class="${i ? 'num' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '<div class="empty">Nada registrado no período.</div>';
 
 VIEWS.trafego = () => {
-  const ok = umGet(UM_ID) && umGet(UM_KEY);
+  const ok = umGet(UM_ID) && umGet(UM_KEY), share = umGet(UM_SHARE);
   setTimeout(() => ok && trafCarregar(), 30);
   return `<div class="top"><div><h1>Tráfego do site</h1><div class="sub">rafaelmsouza.adv.br · acessos, cliques e contatos</div></div>
   ${ok ? `<div class="acts">${[['hoje', 'Hoje'], ['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias']].map(([v, l]) => `<button class="${trafPeriodo === v ? 'pri' : ''}" onclick="trafPeriodo='${v}';render()">${l}</button>`).join('')}</div>` : ''}</div>
-  ${ok ? '<div id="trafOut"><div class="card empty">⏳ Carregando…</div></div>' : ''}
+  ${ok ? '<div id="trafOut"><div class="card empty">⏳ Carregando…</div></div>' : share ? `<div class="card"><div class="acts" style="margin-bottom:10px"><a class="btn pri" href="${esc(share)}" target="_blank" rel="noopener">📈 Abrir o painel completo em tela cheia</a></div>
+  <iframe src="${esc(share)}" style="width:100%;height:1500px;border:0;border-radius:12px;background:#fff" loading="lazy" title="Tráfego do site"></iframe>
+  <p class="sub" style="margin-top:8px">Os cliques aparecem em <b>Events</b>: whatsapp, email, compartilhar, salvar-contato, consulta-ok, consulta-nao-encontrado, noticia-fonte. Se o quadro acima ficar em branco, use o botão para abrir.</p></div>` : ''}
   <div class="card"><h2>Configuração</h2>
   <p class="sub">As estatísticas vêm do <b>Umami</b> (cloud.umami.is), um contador de visitas sem cookies e sem dados pessoais dos visitantes. O ID do site e a chave ficam só neste aparelho.</p>
+  <p class="sub"><b>Plano gratuito:</b> no Umami, abra o site → <b>Edit</b> → <b>Share URL</b> → ligue o compartilhamento e copie o link. Cole aqui:</p>
+  <div class="acts" style="margin-bottom:12px"><input id="umShare" placeholder="https://cloud.umami.is/share/…" value="${esc(share)}" style="flex:1;min-width:260px"><button class="pri" onclick="const v=$('#umShare').value.trim();if(v&&!/^https:\/\/[^ ]+umami[^ ]*\/share\//.test(v)){alert('Cole o link de compartilhamento do Umami (…/share/…).');return}v?localStorage.setItem(UM_SHARE,v):localStorage.removeItem(UM_SHARE);render()">Salvar link</button></div>
+  <p class="sub">Plano Pro do Umami (com chave de API): os números aparecem aqui no próprio ERMS.</p>
   <div class="acts"><input id="umId" placeholder="Website ID (ex.: 1a2b3c4d-…)" value="${esc(umGet(UM_ID))}" style="flex:1;min-width:220px">
   <input id="umKey" type="password" placeholder="${umGet(UM_KEY) ? 'chave cadastrada (…' + esc(umGet(UM_KEY).slice(-4)) + ')' : 'Chave da API do Umami'}" style="flex:1;min-width:220px">
   <button class="pri" onclick="const i=$('#umId').value.trim(),k=$('#umKey').value.trim();if(i)localStorage.setItem(UM_ID,i);if(k)localStorage.setItem(UM_KEY,k);render()">Salvar</button>
