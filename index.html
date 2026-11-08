@@ -1166,7 +1166,7 @@ VIEWS.trafego = () => {
   <div class="card"><h2>Configuração</h2>
   <p class="sub">As estatísticas vêm do <b>Umami</b> (cloud.umami.is), um contador de visitas sem cookies e sem dados pessoais dos visitantes. O ID do site e a chave ficam só neste aparelho.</p>
   <p class="sub"><b>Plano gratuito:</b> no Umami, abra o site → <b>Edit</b> → <b>Share URL</b> → ligue o compartilhamento e copie o link. Cole aqui:</p>
-  <div class="acts" style="margin-bottom:12px"><input id="umShare" placeholder="https://cloud.umami.is/share/…" value="${esc(share)}" style="flex:1;min-width:260px"><button class="pri" onclick="const v=$('#umShare').value.trim();if(v&&!/^https:\/\/[^ ]+umami[^ ]*\/share\//.test(v)){alert('Cole o link de compartilhamento do Umami (…/share/…).');return}v?localStorage.setItem(UM_SHARE,v):localStorage.removeItem(UM_SHARE);render()">Salvar link</button></div>
+  <div class="acts" style="margin-bottom:12px"><input id="umShare" placeholder="https://cloud.umami.is/share/…" value="${esc(share)}" style="flex:1;min-width:260px"><button class="pri" onclick="const v=$('#umShare').value.trim();if(v&&!v.includes('/share/')){alert('Cole o link de compartilhamento do Umami (…/share/…).');return}v?localStorage.setItem(UM_SHARE,v):localStorage.removeItem(UM_SHARE);render()">Salvar link</button></div>
   <p class="sub">Plano Pro do Umami (com chave de API): os números aparecem aqui no próprio ERMS.</p>
   <div class="acts"><input id="umId" placeholder="Website ID (ex.: 1a2b3c4d-…)" value="${esc(umGet(UM_ID))}" style="flex:1;min-width:220px">
   <input id="umKey" type="password" placeholder="${umGet(UM_KEY) ? 'chave cadastrada (…' + esc(umGet(UM_KEY).slice(-4)) + ')' : 'Chave da API do Umami'}" style="flex:1;min-width:220px">
