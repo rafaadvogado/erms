@@ -863,7 +863,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 07/11 12:07</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 08/11 07:42</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1005,7 +1005,7 @@ async function iaChamar(col, texto, imagens) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model: IA_MODELO, max_tokens: 2000, system: iaSistema(col), tools: [tool], tool_choice: { type: 'tool', name: tool.name }, messages: [{ role: 'user', content }] })
+    body: JSON.stringify({ model: IA_MODELO, max_tokens: 8000, system: iaSistema(col) + `\n\nResponda SEMPRE chamando a ferramenta ${tool.name}, uma única vez, sem texto adicional.`, tools: [tool], tool_choice: { type: 'auto' }, messages: [{ role: 'user', content }] })
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
@@ -1015,8 +1015,12 @@ async function iaChamar(col, texto, imagens) {
     throw new Error(m);
   }
   const u = (j.content || []).find(c => c.type === 'tool_use');
-  if (!u) throw new Error('a IA não devolveu os dados. Tente de novo.');
-  return u.input;
+  if (u) return u.input;
+  // reserva: se o modelo respondeu em texto, tenta achar um JSON na resposta
+  const txt = (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+  const m = txt.match(/\{[\s\S]*\}/);
+  if (m) { try { return JSON.parse(m[0]) } catch (e) { } }
+  throw new Error('a IA não devolveu os dados. Tente de novo.');
 }
 
 /* ---------- localizar processo / cliente no ERMS ---------- */
