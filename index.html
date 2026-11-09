@@ -866,7 +866,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 09/11 08:10</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 09/11 08:19</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1234,6 +1234,37 @@ async function portalChave(cpf, senha) {
 const SITE_URL = 'https://rafaelmsouza.adv.br';
 const soDig = s => String(s || '').replace(/\D/g, '');
 const pendentesPortal = () => db.portal.filter(r => r.status === 'Pendente');
+const nomeChave = n => norm(n).replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+function nProc(pid) { return db.processos.filter(x => x.clienteId === pid).length }
+/* clientes com o mesmo nome (sem CPF ou com o mesmo CPF), mais processos primeiro */
+function candidatosNome(nome, cpf, exceto) {
+  const k = nomeChave(nome), c = soDig(cpf); if (!k) return [];
+  return db.pessoas.filter(p => p.id !== exceto && nomeChave(p.nome) === k && (!soDig(p.doc) || soDig(p.doc) === c)).sort((a, b) => nProc(b.id) - nProc(a.id));
+}
+/* junta o cadastro "de" dentro do "para": vínculos, dados que faltam e acesso ao site; depois apaga o "de" */
+function juntarPessoas(deId, paraId) {
+  const de = byId('pessoas', deId), para = byId('pessoas', paraId); if (!de || !para || de === para) return;
+  const agora = new Date().toISOString();
+  COLS.forEach(c => (db[c] || []).forEach(x => { let m = false; ['pessoaId', 'clienteId', 'contrariaId'].forEach(f => { if (x[f] === deId) { x[f] = paraId; m = true } }); if (m) x._m = agora }));
+  ['doc', 'nascimento', 'telefone', 'email', 'endereco', 'estadoCivil', 'profissao'].forEach(f => { if (de[f]) para[f] = de[f] });
+  if (de.obs) para.obs = [para.obs, de.obs].filter(Boolean).join('\n');
+  if (de.portalChave) { para.portalChave = de.portalChave; if (de.senhaPortal) para.senhaPortal = de.senhaPortal; else delete para.senhaPortal }
+  para._m = agora; db.pessoas.splice(db.pessoas.indexOf(de), 1);
+}
+function juntarCadastro(deId, paraId) {
+  const de = byId('pessoas', deId), para = byId('pessoas', paraId); if (!de || !para) return;
+  if (!confirm(`Juntar "${de.nome}" (criado pelo site) com o cadastro antigo "${para.nome}" (${nProc(para.id)} processo(s))? Os dados e o acesso ao site passam para o cadastro antigo e o duplicado é apagado.`)) return;
+  juntarPessoas(deId, paraId); db.portal.forEach(r => { if (r.pessoaId === deId) { r.pessoaId = paraId; r._m = new Date().toISOString() } });
+  save(); location.hash = '#pessoa/' + paraId; render(); toast('Cadastros juntados.');
+}
+function juntarComOutro(deId) {
+  const de = byId('pessoas', deId); if (!de) return;
+  const t = prompt('Digite parte do nome do cadastro antigo (o que tem os processos):', de.nome.split(' ')[0]); if (!t) return;
+  const L = db.pessoas.filter(p => p.id !== deId && norm(p.nome).includes(norm(t).trim())).sort((a, b) => nProc(b.id) - nProc(a.id)).slice(0, 15);
+  if (!L.length) { alert('Nenhum cadastro encontrado com esse nome.'); return }
+  const n = prompt('Qual é o cadastro antigo? Digite o número:\n\n' + L.map((p, i) => `${i + 1}. ${p.nome} – ${nProc(p.id)} processo(s)${p.doc ? ' · ' + p.doc : ''}`).join('\n')); const c = L[+n - 1];
+  if (c) juntarCadastro(deId, c.id);
+}
 function acharPorCPF(cpf) { const c = soDig(cpf); return c ? db.pessoas.find(p => soDig(p.doc) === c) : null }
 function marcarTarefaPortal(pid) { db.prazos.filter(z => z.portalId === pid && !z.feito).forEach(z => { z.feito = true; z._m = new Date().toISOString() }) }
 const waPara = (tel, txt) => { let n = soDig(tel); if (n.length <= 11) n = '55' + n; return `https://wa.me/${n}?text=${encodeURIComponent(txt)}` };
@@ -1245,11 +1276,12 @@ VIEWS.portal = () => {
   const I = (l, v) => v ? `<div><dt>${l}</dt><dd>${esc(v)}</dd></div>` : '';
   return `<div class="top"><div><h1>Cadastros do site</h1><div class="sub">Clientes que se cadastraram na Área do cliente de ${SITE_URL.replace('https://', '')}. Confira a identidade antes de aprovar.</div></div></div>
   ${L.length ? L.map(r => {
-    const ex = acharPorCPF(r.cpf), pend = r.status === 'Pendente';
+    const ex = acharPorCPF(r.cpf), pend = r.status === 'Pendente', cand = ex ? [] : candidatosNome(r.nome, r.cpf);
     const end = [r.rua && `${r.rua}, ${r.numero}${r.complemento ? ' – ' + r.complemento : ''}`, r.bairro, r.cidade && `${r.cidade}-${r.uf}`, r.cep && 'CEP ' + r.cep].filter(Boolean).join(' · ');
     return `<div class="card" style="${pend ? 'border-left:4px solid #e0b100' : ''}">
     <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${esc(r.nome)}</h2><span class="tag ${pend ? 'y' : r.status === 'Aprovado' ? 'g' : 'n'}">${esc(r.status)}${r.decididoEm ? ' em ' + fd(r.decididoEm) : ''}</span></div>
-    <div class="sub">Enviado em ${fdt(r.enviado.replace('Z', '')).slice(0, 16)} · ${ex ? `CPF já cadastrado: <a href="#pessoa/${ex.id}">${esc(ex.nome)}</a>` : '<b>CPF novo</b> – será criado um cliente'}</div>
+    <div class="sub">Enviado em ${fdt(r.enviado.replace('Z', '')).slice(0, 16)} · ${ex ? `CPF já cadastrado: <a href="#pessoa/${ex.id}">${esc(ex.nome)}</a> (${nProc(ex.id)} processo(s))` : cand.length && pend ? '<b>Cliente com o mesmo nome já existe</b> – escolha abaixo' : pend ? '<b>Cliente novo</b> – será criado um cadastro' : ''}</div>
+    ${pend && cand.length ? `<div style="margin-top:8px"><label class="sub">Vincular a: <select id="vinc_${r.id}">${cand.map(c => `<option value="${c.id}">${esc(c.nome)} – ${nProc(c.id)} processo(s)${c.telefone ? ' · ' + esc(c.telefone) : ''}</option>`).join('')}<option value="">➕ Criar cliente novo</option></select></label></div>` : ''}
     <dl class="info" style="margin-top:10px">${I('CPF', r.cpf)}${I('Nascimento', fd(r.nascimento))}${I('WhatsApp', r.telefone)}${I('E-mail', r.email)}${I('Endereço', end)}${I('Estado civil', r.estadoCivil)}${I('Profissão', r.profissao)}${I('Como conheceu', r.origem)}${I('Aceite LGPD', r.aceite ? fdt(r.aceite.em.replace('Z', '')).slice(0, 16) : '')}</dl>
     ${pend ? `<div class="acts" style="margin-top:12px"><a class="btn" href="${waPara(r.telefone, `Olá, ${r.nome.split(' ')[0]}! Aqui é o Dr. Rafael de Mello Souza. Recebi o seu cadastro na Área do Cliente do meu site. Você confirma que foi você mesmo(a) que fez o cadastro?`)}" target="_blank">💬 Confirmar pelo WhatsApp</a>
       <button class="pri" onclick="aprovarPortal('${r.id}')">✓ Aprovar e liberar acesso</button><button class="danger" onclick="recusarPortal('${r.id}')">Recusar</button></div>`
@@ -1259,8 +1291,10 @@ VIEWS.portal = () => {
 function aprovarPortal(id) {
   if (bloqueado()) return;
   const r = db.portal.find(x => x.id === id); if (!r || !r.chave) return;
-  let p = acharPorCPF(r.cpf); const novoCli = !p, agora = new Date().toISOString();
-  if (!confirm(`${novoCli ? 'Criar o cliente' : 'Atualizar o cadastro de'} ${r.nome} com os dados enviados e liberar o acesso ao site?`)) return;
+  let p = acharPorCPF(r.cpf);
+  if (!p) { const sel = document.getElementById('vinc_' + id); const v = sel ? sel.value : (candidatosNome(r.nome, r.cpf)[0] || {}).id; if (v) p = byId('pessoas', v) }
+  const novoCli = !p, agora = new Date().toISOString();
+  if (!confirm(`${novoCli ? 'Criar o cliente' : 'Atualizar o cadastro de'} ${novoCli ? r.nome : p.nome + ' (' + nProc(p.id) + ' processo(s))'} com os dados enviados e liberar o acesso ao site?`)) return;
   if (!p) { p = { id: uid('pe'), nome: r.nome, tipo: 'Cliente', criado: agora }; db.pessoas.push(p) }
   const end = `${r.rua}, ${r.numero}${r.complemento ? ' – ' + r.complemento : ''} – ${r.bairro}, ${r.cidade}-${r.uf}, CEP ${r.cep}`;
   Object.assign(p, { doc: r.cpf, nascimento: r.nascimento || p.nascimento || '', telefone: r.telefone || p.telefone || '', email: r.email || p.email || '', endereco: end,
@@ -1300,9 +1334,12 @@ function bloquearPortal(pid) {
 function acessoSiteHtml(p) {
   const pc = p.portalChave, ativo = pc && pc.ativo !== false;
   const temProc = db.processos.some(x => x.clienteId === p.id);
+  const dup = !temProc && pc ? candidatosNome(p.nome, p.doc, p.id).filter(c => nProc(c.id)) : [];
+  const avisoDup = dup.length ? `<div class="card" style="padding:12px 16px;border-left:4px solid #e0b100"><b>⚠️ Possível cadastro duplicado.</b> <span class="sub">Já existe outro cadastro com este nome e com processos:</span><div class="acts" style="margin-top:8px">${dup.map(c => `<button class="pri" onclick="juntarCadastro('${p.id}','${c.id}')">🔗 Juntar com ${esc(c.nome)} (${nProc(c.id)} processo(s))</button>`).join('')}</div></div>` : '';
   if (!temProc && !pc) return '';
-  return `<div class="card" style="padding:12px 16px"><b>🌐 Área do cliente no site:</b> ${ativo ? `<span class="tag g">acesso liberado</span> <span class="sub">desde ${fd(pc.desde)} · ${pc.origem === 'site' ? 'senha criada pelo cliente' : 'senha gerada pelo escritório' + (p.senhaPortal ? ': <b>' + esc(p.senhaPortal) + '</b>' : '')}</span>` : pc ? '<span class="tag n">bloqueado</span>' : '<span class="sub">sem acesso (o cliente pode se cadastrar no site, ou gere uma senha)</span>'}
-  <div class="acts" style="margin-top:8px">${p.telefone && ativo ? `<a class="btn" href="${waPara(p.telefone, msgLiberado(p.nome, p.senhaPortal))}" target="_blank">💬 Enviar acesso pelo WhatsApp</a>` : ''}<button onclick="gerarSenhaPortal('${p.id}')">🔑 ${ativo ? 'Gerar nova senha' : 'Gerar senha de acesso'}</button>${ativo ? `<button onclick="bloquearPortal('${p.id}')">Bloquear</button>` : ''}</div></div>`;
+  const btnJuntar = !temProc && pc && !dup.length ? `<button onclick="juntarComOutro('${p.id}')">🔗 Juntar com outro cadastro</button>` : '';
+  return avisoDup + `<div class="card" style="padding:12px 16px"><b>🌐 Área do cliente no site:</b> ${ativo ? `<span class="tag g">acesso liberado</span> <span class="sub">desde ${fd(pc.desde)} · ${pc.origem === 'site' ? 'senha criada pelo cliente' : 'senha gerada pelo escritório' + (p.senhaPortal ? ': <b>' + esc(p.senhaPortal) + '</b>' : '')}</span>` : pc ? '<span class="tag n">bloqueado</span>' : '<span class="sub">sem acesso (o cliente pode se cadastrar no site, ou gere uma senha)</span>'}
+  <div class="acts" style="margin-top:8px">${p.telefone && ativo ? `<a class="btn" href="${waPara(p.telefone, msgLiberado(p.nome, p.senhaPortal))}" target="_blank">💬 Enviar acesso pelo WhatsApp</a>` : ''}<button onclick="gerarSenhaPortal('${p.id}')">🔑 ${ativo ? 'Gerar nova senha' : 'Gerar senha de acesso'}</button>${ativo ? `<button onclick="bloquearPortal('${p.id}')">Bloquear</button>` : ''}${btnJuntar}</div></div>`;
 }
 const _pessoaBase = VIEWS.pessoa;
 VIEWS.pessoa = id => { const h = _pessoaBase(id), p = byId('pessoas', id); return p ? h.replace('<div class="tabs">', acessoSiteHtml(p) + '<div class="tabs">') : h };
