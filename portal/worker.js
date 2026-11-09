@@ -103,7 +103,7 @@ async function areaCliente(fid, env) {
   if (!c) return null;
   const hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
   const P = Object.fromEntries((d.pessoas || []).map(p => [p.id, p]));
-  const procs = (d.processos || []).filter(p => vivo(p) && p.clienteId === c.id && (p.portal || 'Mostrar') !== 'Ocultar' && dig(p.numero).length >= 15)
+  const procs = (d.processos || []).filter(p => vivo(p) && (p.clienteId === c.id || (p.outrosClientes || []).includes(c.id)) && (p.portal || 'Mostrar') !== 'Ocultar' && dig(p.numero).length >= 15)
     .sort((a, b) => ((['Ativo', 'Suspenso'].includes(a.status || 'Ativo') ? 0 : 1) - (['Ativo', 'Suspenso'].includes(b.status || 'Ativo') ? 0 : 1)) || String(a.numero).localeCompare(String(b.numero)));
   const conteudo = {
     cliente: c.nome || '', atualizado: hoje,

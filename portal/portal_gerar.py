@@ -14,6 +14,10 @@ Cliente sem uma das duas não tem acesso. Remove a pasta antiga d/ (versão 1).
 Nada legível sai deste script: nomes, números e andamentos ficam todos dentro do conteúdo cifrado.
 """
 import base64, datetime, glob, hashlib, json, os, re, shutil, sys
+
+def agora_br():
+    """Horário de Brasília (UTC-3), independente do fuso da máquina."""
+    return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=3)
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 ITER = 200000
@@ -92,7 +96,7 @@ def conteudo_processo(p, d, P, and_por, agenda_por):
 
 
 def gerar(d, saida):
-    hoje = datetime.date.today().isoformat()
+    hoje = agora_br().date().isoformat()
     P = {p['id']: p for p in d['pessoas']}
     and_por, agenda_por, proc_por = {}, {}, {}
     for a in d['andamentos']:
@@ -102,7 +106,8 @@ def gerar(d, saida):
             agenda_por.setdefault(z['processoId'], []).append(z)
     for p in d['processos']:
         if (p.get('portal') or 'Mostrar') != 'Ocultar' and len(dig(p.get('numero'))) >= 15:
-            proc_por.setdefault(p.get('clienteId'), []).append(p)
+            for cid in dict.fromkeys([p.get('clienteId')] + list(p.get('outrosClientes') or [])):
+                proc_por.setdefault(cid, []).append(p)
     for velha in ('d', 'c'):
         if os.path.isdir(os.path.join(saida, velha)):
             shutil.rmtree(os.path.join(saida, velha))
@@ -126,7 +131,7 @@ def gerar(d, saida):
         res['clientes_com_acesso'] += 1
         res['processos_disponiveis'] += len(procs)
     open(os.path.join(pasta, '.keep'), 'w').close()
-    json.dump({'atualizado': datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')}, open(os.path.join(saida, 'atualizado.json'), 'w'))
+    json.dump({'atualizado': agora_br().strftime('%Y-%m-%dT%H:%M')}, open(os.path.join(saida, 'atualizado.json'), 'w'))
     return res
 
 
