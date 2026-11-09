@@ -2,7 +2,8 @@
    Rotas:
      POST /cadastro  – recebe o cadastro do cliente (dados + chave derivada da senha; a senha NÃO vem)
                        e grava um pacote na caixa de entrada do ERMS (Dropbox): cadastro pendente + tarefa.
-     GET  /c/<id>    – área do cliente: monta, CRIPTOGRAFA com a chave do cliente e devolve os processos
+     GET  /c/<id>    – área do cliente: monta, CRIPTOGRAFA com a chave do cliente e devolve os processos (registra o acesso)
+     GET  /v/<id>/<nº> – registra que o cliente abriu um processo
                        dele, lidos do dados.json do ERMS. Só responde para cadastros aprovados no ERMS.
    Variáveis (Settings → Variables and Secrets):
      DBX_REFRESH  (secreta) – token gerado no ERMS em Backup e ajustes → "Chave do site"
@@ -18,7 +19,7 @@ const ub = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 let TOKEN = null, DADOS = null;
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const origens = (env.ORIGENS || 'https://rafaelmsouza.adv.br').split(',').map(s => s.trim());
     const origem = req.headers.get('Origin') || '';
     const cors = { 'Access-Control-Allow-Origin': origens.includes(origem) ? origem : origens[0], 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type', 'Vary': 'Origin' };
@@ -32,8 +33,14 @@ export default {
       }
       const m = url.pathname.match(/^\/c\/([0-9a-f]{32})$/);
       if (req.method === 'GET' && m) {
-        const r = await areaCliente(m[1], env);
+        const r = await areaCliente(m[1], env, req, ctx);
         return r ? json(r) : json({ erro: 'não encontrado' }, 404);
+      }
+      const v = url.pathname.match(/^\/v\/([0-9a-f]{32})\/(.{1,40})$/);          // cliente abriu um processo
+      if (req.method === 'GET' && v) {
+        const d = await lerDados(env), c = clientePorChave(d, v[1]);
+        if (c && ctx) ctx.waitUntil(registrarAcesso(env, { tipo: 'processo', pid: c.id, nome: c.nome || '', numero: decodeURIComponent(v[2]).slice(0, 30), disp: dispositivo(req) }).catch(() => { }));
+        return json({ ok: true });
       }
       return json({ ok: true, servico: 'ERMS – site' }, 200);
     } catch (e) {
@@ -96,15 +103,32 @@ async function cadastro(corpo, env, req) {
 
 /* ---------- área do cliente ---------- */
 const limpa = t => String(t || '').replace(/\s*\((?:[^()]*?)(?:já lançad|confere|conferir|automação)[^()]*\)/gi, '').replace(/\s*–\s*segunda publicação idêntica/g, '').replace(/\s+/g, ' ').trim();
-async function areaCliente(fid, env) {
+function clientePorChave(d, fid) {
+  const exc = d.excluidos || {};
+  return (d.pessoas || []).find(p => !exc[p.id] && p.portalChave && p.portalChave.id === fid && p.portalChave.ativo !== false) || null;
+}
+const dispositivo = req => /Mobi|Android|iPhone|iPad/i.test(req.headers.get('User-Agent') || '') ? 'celular' : 'computador';
+/* registro de acessos: /acessos/AAAA-MM.json (lido pelo ERMS em "Acessos dos clientes") */
+async function registrarAcesso(env, reg) {
+  const br = new Date(Date.now() - 3 * 3600e3).toISOString(), path = `/acessos/${br.slice(0, 7)}.json`;
+  reg = { em: new Date().toISOString(), ...reg };
+  const auth = 'Bearer ' + await token(env);
+  let lista = [];
+  const r = await fetch('https://content.dropboxapi.com/2/files/download', { method: 'POST', headers: { Authorization: auth, 'Dropbox-API-Arg': argHeader({ path }) } });
+  if (r.ok) { try { lista = await r.json() } catch (e) { lista = [] } }
+  lista.push(reg); if (lista.length > 5000) lista = lista.slice(-5000);
+  await fetch('https://content.dropboxapi.com/2/files/upload', { method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': argHeader({ path, mode: 'overwrite', mute: true }) }, body: JSON.stringify(lista) });
+}
+async function areaCliente(fid, env, req, ctx) {
   const d = await lerDados(env), exc = d.excluidos || {};
   const vivo = x => x && !exc[x.id];
-  const c = (d.pessoas || []).find(p => vivo(p) && p.portalChave && p.portalChave.id === fid && p.portalChave.ativo !== false);
+  const c = clientePorChave(d, fid);
   if (!c) return null;
   const hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
   const P = Object.fromEntries((d.pessoas || []).map(p => [p.id, p]));
   const procs = (d.processos || []).filter(p => vivo(p) && (p.clienteId === c.id || (p.outrosClientes || []).includes(c.id)) && (p.portal || 'Mostrar') !== 'Ocultar' && dig(p.numero).length >= 15)
     .sort((a, b) => ((['Ativo', 'Suspenso'].includes(a.status || 'Ativo') ? 0 : 1) - (['Ativo', 'Suspenso'].includes(b.status || 'Ativo') ? 0 : 1)) || String(a.numero).localeCompare(String(b.numero)));
+  if (ctx && req) ctx.waitUntil(registrarAcesso(env, { tipo: 'entrada', pid: c.id, nome: c.nome || '', proc: procs.filter(p => ['Ativo', 'Suspenso'].includes(p.status || 'Ativo')).length, disp: dispositivo(req) }).catch(() => { }));
   const conteudo = {
     cliente: c.nome || '', atualizado: hoje,
     processos: procs.map(p => {

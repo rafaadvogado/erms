@@ -884,7 +884,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 09/11 10:34 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 09/11 10:49 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1388,6 +1388,59 @@ async function chaveSitePasso2() {
     <div class="acts"><button onclick="navigator.clipboard.writeText($('#chTok').value.trim()).then(()=>toast('Chave copiada.'))">📋 Copiar</button></div><p class="sub">Depois de colar no Cloudflare, saia desta tela: a chave não fica guardada no ERMS.</p>`;
   } catch (e) { alert('Não foi possível gerar: ' + e.message) }
 }
+
+/* ===== Acessos dos clientes à Área do cliente (registrados pelo intermediário do site em /acessos/AAAA-MM.json) ===== */
+let ACESSOS = null, ACESSOS_T = 0;
+function mesesAcessos(n) {
+  const L = [], d = new Date(Date.now() - 3 * 3600e3);
+  for (let i = 0; i < n; i++) { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - i, 1)); L.push(x.toISOString().slice(0, 7)) }
+  return L;
+}
+async function carregarAcessos(forcar) {
+  if (ACESSOS && !forcar && Date.now() - ACESSOS_T < 60000) return ACESSOS;
+  if (typeof dbx === 'undefined' || !dbx) throw new Error('conecte este aparelho ao Dropbox');
+  const todos = [];
+  for (const m of mesesAcessos(3)) {
+    const f = await dbxBaixar(`/acessos/${m}.json`);
+    if (f) { try { todos.push(...JSON.parse(f.texto)) } catch (e) { } }
+  }
+  ACESSOS = todos.sort((a, b) => String(b.em).localeCompare(String(a.em))); ACESSOS_T = Date.now();
+  return ACESSOS;
+}
+const descAcesso = a => a.tipo === 'processo' ? `abriu o processo <b>${esc(a.numero || '')}</b>` : `entrou na Área do cliente${a.proc != null ? ` (${a.proc} processo(s) ativo(s))` : ''}`;
+
+VIEWS.acessos = () => {
+  setTimeout(() => preencherAcessos(false), 0);
+  return `<div class="top"><div><h1>Acessos dos clientes</h1><div class="sub">Quem entrou na Área do cliente de ${SITE_URL.replace('https://', '')} e quais processos abriu (últimos 3 meses, horário de Brasília).</div></div><div class="acts"><button onclick="preencherAcessos(true)">↻ Atualizar</button></div></div>
+  <div class="filters"><input type="search" id="acQ" placeholder="Buscar cliente ou nº do processo…" oninput="preencherAcessos(false)"></div>
+  <div id="acL"><div class="card empty">Carregando…</div></div>`;
+};
+async function preencherAcessos(forcar) {
+  const el = document.getElementById('acL'); if (!el) return;
+  let L; try { L = await carregarAcessos(forcar) } catch (e) { el.innerHTML = `<div class="card empty">Não foi possível ler os acessos: ${esc(e.message)}</div>`; return }
+  if (!document.getElementById('acL')) return;
+  const q = norm(document.getElementById('acQ')?.value || '');
+  const F = q ? L.filter(a => norm((byId('pessoas', a.pid)?.nome || a.nome) + ' ' + (a.numero || '')).includes(q)) : L;
+  if (!F.length) { el.innerHTML = `<div class="card empty">${L.length ? 'Nada encontrado.' : 'Nenhum acesso registrado ainda. Assim que um cliente entrar na Área do cliente, aparece aqui.'}</div>`; return }
+  const por = {};
+  F.forEach(a => { const r = por[a.pid] || (por[a.pid] = { pid: a.pid, nome: byId('pessoas', a.pid)?.nome || a.nome, ult: a.em, ent: 0, abriu: new Set() }); if (a.tipo === 'processo') r.abriu.add(a.numero); else r.ent++ });
+  const R = Object.values(por).sort((a, b) => String(b.ult).localeCompare(String(a.ult)));
+  el.innerHTML = `<div class="card"><h2>Por cliente</h2><div class="list">${R.map(r => `<div class="row" onclick="go('pessoa/${r.pid}')"><div class="grow"><b>${esc(r.nome)}</b><div class="sub">Último acesso: ${fdt(r.ult)} · ${r.ent} entrada(s)${r.abriu.size ? ' · abriu: ' + [...r.abriu].map(esc).join(', ') : ''}</div></div></div>`).join('')}</div></div>
+  <div class="card"><h2>Todos os acessos</h2><div class="list">${F.slice(0, 300).map(a => `<div class="row" onclick="go('pessoa/${a.pid}')"><div class="grow"><span class="sub">${fdt(a.em)}</span> · <b>${esc(byId('pessoas', a.pid)?.nome || a.nome)}</b> ${descAcesso(a)} <span class="sub">· ${esc(a.disp || '')}</span></div></div>`).join('')}</div>${F.length > 300 ? '<div class="sub">Mostrando os 300 mais recentes.</div>' : ''}</div>`;
+}
+async function preencherAcessosPessoa(pid) {
+  const el = document.querySelector(`[data-acessos="${pid}"]`); if (!el) return;
+  try {
+    const L = (await carregarAcessos(false)).filter(a => a.pid === pid);
+    const e2 = document.querySelector(`[data-acessos="${pid}"]`); if (!e2) return;
+    e2.innerHTML = L.length ? `👁 Último acesso ao site: <b>${fdt(L[0].em)}</b> (${L[0].tipo === 'processo' ? 'abriu o processo ' + esc(L[0].numero || '') : 'entrou na Área do cliente'}) · ${L.filter(a => a.tipo !== 'processo').length} entrada(s) nos últimos 3 meses · <a href="#acessos">ver acessos</a>` : '👁 Ainda não acessou a Área do cliente (últimos 3 meses).';
+  } catch (e) { }
+}
+(() => {
+  const base = acessoSiteHtml;
+  acessoSiteHtml = p => { const h = base(p); if (!h || !p.portalChave) return h; setTimeout(() => preencherAcessosPessoa(p.id), 0); return h.replace(/<\/div><\/div>$/, `</div><div class="sub" style="margin-top:8px" data-acessos="${p.id}"></div></div>`) };
+  const i = NAV.findIndex(n => n[0] === 'trafego'); if (!NAV.some(n => n[0] === 'acessos')) NAV.splice(i < 0 ? NAV.length : i, 0, ['acessos', '👁', 'Acessos dos clientes']);
+})();
 
 render();initDropbox();
 </script>
