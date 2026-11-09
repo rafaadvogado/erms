@@ -3,18 +3,20 @@
 
 Uso: python3 portal_gerar.py DADOS.json PASTA_SAIDA [--entrada PASTA_ENTRADA]
 
-Para cada processo (exceto os marcados "Ocultar" no campo Portal do cliente) cujo cliente tem CPF/CNPJ,
-gera PASTA_SAIDA/d/<id>.json, legível só com: número do processo + CPF + senha do portal (padrão 1988).
-  id   = PBKDF2-SHA256(material, "erms-portal-id-v1", 200000) -> 16 bytes hex
-  chave= PBKDF2-SHA256(material, sal aleatório, 200000) -> AES-256-GCM
-  material = "<só dígitos do processo>|<só dígitos do CPF>|<senha>"
+Gera PASTA_SAIDA/c/<id>.json: UM arquivo por cliente, com todos os processos dele (exceto os marcados
+"Ocultar" no campo Portal do cliente), legível só com CPF + senha do cliente.
+  material = "<só dígitos do CPF>|<senha>"
+  id    = PBKDF2-SHA256(material, "erms-portal-cli-v2", 200000) -> 16 bytes hex
+  chave = PBKDF2-SHA256(material, "erms-portal-key-v2", 200000) -> AES-256-GCM
+A senha vem de: (1) cadastro feito pelo cliente no site e APROVADO no ERMS (pessoa.portalChave = {id, k},
+derivados no navegador do cliente — o ERMS nunca recebe a senha), ou (2) senha gerada no ERMS (pessoa.senhaPortal).
+Cliente sem uma das duas não tem acesso. Remove a pasta antiga d/ (versão 1).
 Nada legível sai deste script: nomes, números e andamentos ficam todos dentro do conteúdo cifrado.
 """
 import base64, datetime, glob, hashlib, json, os, re, shutil, sys
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 ITER = 200000
-SENHA_PADRAO = '1988'
 FONTES_OK = ('DataJud', 'DJEN', 'Recorte', 'PJe')     # andamentos internos ("Lançamento manual") não vão ao portal
 TIPOS_AGENDA = ('Audiência', 'Perícia')               # só compromissos que envolvem o cliente
 STATUS_FASE = {'Ativo': 'Em andamento', 'Suspenso': 'Suspenso', 'Arquivado provisoriamente': 'Arquivado provisoriamente'}
@@ -58,56 +60,72 @@ def carregar(dados_path, entrada=None):
     return d
 
 
+def chave_cliente(c):
+    """(id_hex, chave_bytes) do cliente: cadastro aprovado no site (portalChave) ou senha gerada no ERMS (senhaPortal)."""
+    pc = c.get('portalChave') or {}
+    if pc.get('ativo') is False:
+        return None, None
+    if pc.get('id') and pc.get('k'):
+        return pc['id'], base64.b64decode(pc['k'])
+    senha = str(c.get('senhaPortal') or '').strip()
+    doc = dig(c.get('doc'))
+    if not senha or len(doc) not in (11, 14):
+        return None, None
+    material = f'{doc}|{senha}'
+    return pbkdf2(material, b'erms-portal-cli-v2', 16).hex(), pbkdf2(material, b'erms-portal-key-v2', 32)
+
+
+def conteudo_processo(p, d, P, and_por, agenda_por):
+    st = p.get('status') or 'Ativo'
+    ands = sorted([a for a in and_por.get(p['id'], []) if any(f in str(a.get('fonte') or 'DataJud') for f in FONTES_OK)],
+                  key=lambda a: a.get('data') or '', reverse=True)[:15]
+    return {
+        'numero': p.get('numero', ''), 'acao': p.get('acao', ''), 'area': p.get('area', ''),
+        'tribunal': p.get('tribunal', ''), 'vara': p.get('vara', ''), 'comarca': p.get('comarca', ''),
+        'parteContraria': (P.get(p.get('contrariaId')) or {}).get('nome', ''),
+        'ativo': st in ('Ativo', 'Suspenso'), 'situacaoCadastral': STATUS_FASE.get(st, 'Encerrado' if st.startswith('Encerrado') or st in ('Arquivado', 'Acordo') else st),
+        'resumo': (p.get('situacao') or '').strip(),
+        'andamentos': [{'data': a.get('data', ''), 'texto': limpa_andamento(a.get('descricao'))} for a in ands if limpa_andamento(a.get('descricao'))],
+        'agenda': [{'data': z.get('data', ''), 'hora': z.get('hora', ''), 'tipo': z.get('tipo', ''), 'titulo': re.sub(r'^⚠\s*\w+\s*–\s*', '', z.get('titulo', '')), 'local': z.get('local', '')}
+                   for z in sorted(agenda_por.get(p['id'], []), key=lambda z: (z.get('data') or '', z.get('hora') or ''))],
+    }
+
+
 def gerar(d, saida):
     hoje = datetime.date.today().isoformat()
     P = {p['id']: p for p in d['pessoas']}
-    and_por = {}
+    and_por, agenda_por, proc_por = {}, {}, {}
     for a in d['andamentos']:
         and_por.setdefault(a.get('processoId'), []).append(a)
-    agenda_por = {}
     for z in d['prazos']:
         if z.get('processoId') and z.get('tipo') in TIPOS_AGENDA and not z.get('feito') and (z.get('data') or '') >= hoje:
             agenda_por.setdefault(z['processoId'], []).append(z)
-    pasta = os.path.join(saida, 'd')
-    if os.path.isdir(pasta):
-        shutil.rmtree(pasta)
-    os.makedirs(pasta)
-    res = {'gerados': 0, 'sem_cpf': [], 'ocultos': 0, 'sem_numero': 0}
     for p in d['processos']:
-        if (p.get('portal') or 'Mostrar') == 'Ocultar':
-            res['ocultos'] += 1
+        if (p.get('portal') or 'Mostrar') != 'Ocultar' and len(dig(p.get('numero'))) >= 15:
+            proc_por.setdefault(p.get('clienteId'), []).append(p)
+    for velha in ('d', 'c'):
+        if os.path.isdir(os.path.join(saida, velha)):
+            shutil.rmtree(os.path.join(saida, velha))
+    pasta = os.path.join(saida, 'c')
+    os.makedirs(pasta)
+    res = {'clientes_com_acesso': 0, 'processos_disponiveis': 0, 'sem_senha': [], 'sem_cpf': []}
+    for cid, procs in proc_por.items():
+        c = P.get(cid) or {}
+        ativos = [p for p in procs if (p.get('status') or 'Ativo') in ('Ativo', 'Suspenso')]
+        fid, k = chave_cliente(c)
+        if not fid:
+            if ativos:
+                (res['sem_cpf'] if len(dig(c.get('doc'))) not in (11, 14) else res['sem_senha']).append(c.get('nome') or '?')
             continue
-        num = dig(p.get('numero'))
-        if len(num) < 15:
-            res['sem_numero'] += 1
-            continue
-        c = P.get(p.get('clienteId')) or {}
-        doc = dig(c.get('doc'))
-        if len(doc) not in (11, 14):
-            if (p.get('status') or 'Ativo') in ('Ativo', 'Suspenso'):
-                res['sem_cpf'].append(c.get('nome') or '?')
-            continue
-        senha = str(c.get('senhaPortal') or '').strip() or SENHA_PADRAO
-        st = p.get('status') or 'Ativo'
-        ands = sorted([a for a in and_por.get(p['id'], []) if any(f in str(a.get('fonte') or 'DataJud') for f in FONTES_OK)],
-                      key=lambda a: a.get('data') or '', reverse=True)[:15]
-        conteudo = {
-            'cliente': c.get('nome', ''), 'numero': p.get('numero', ''), 'acao': p.get('acao', ''), 'area': p.get('area', ''),
-            'tribunal': p.get('tribunal', ''), 'vara': p.get('vara', ''), 'comarca': p.get('comarca', ''),
-            'parteContraria': (P.get(p.get('contrariaId')) or {}).get('nome', ''),
-            'ativo': st in ('Ativo', 'Suspenso'), 'situacaoCadastral': STATUS_FASE.get(st, 'Encerrado' if st.startswith('Encerrado') or st in ('Arquivado', 'Acordo') else st),
-            'resumo': (p.get('situacao') or '').strip(),
-            'andamentos': [{'data': a.get('data', ''), 'texto': limpa_andamento(a.get('descricao'))} for a in ands if limpa_andamento(a.get('descricao'))],
-            'agenda': [{'data': z.get('data', ''), 'hora': z.get('hora', ''), 'tipo': z.get('tipo', ''), 'titulo': re.sub(r'^⚠\s*\w+\s*–\s*', '', z.get('titulo', '')), 'local': z.get('local', '')}
-                       for z in sorted(agenda_por.get(p['id'], []), key=lambda z: (z.get('data') or '', z.get('hora') or ''))],
-            'atualizado': hoje,
-        }
-        material = f'{num}|{doc}|{senha}'
-        fid = pbkdf2(material, b'erms-portal-id-v1', 16).hex()
-        sal, iv = os.urandom(16), os.urandom(12)
-        ct = AESGCM(pbkdf2(material, sal, 32)).encrypt(iv, json.dumps(conteudo, ensure_ascii=False).encode('utf-8'), None)
-        json.dump({'v': 1, 's': b64(sal), 'iv': b64(iv), 'c': b64(ct)}, open(os.path.join(pasta, fid + '.json'), 'w'))
-        res['gerados'] += 1
+        procs = sorted(procs, key=lambda p: (0 if (p.get('status') or 'Ativo') in ('Ativo', 'Suspenso') else 1, p.get('numero') or ''))
+        conteudo = {'cliente': c.get('nome', ''), 'atualizado': hoje,
+                    'processos': [conteudo_processo(p, d, P, and_por, agenda_por) for p in procs]}
+        iv = os.urandom(12)
+        ct = AESGCM(k).encrypt(iv, json.dumps(conteudo, ensure_ascii=False).encode('utf-8'), None)
+        json.dump({'v': 2, 'iv': b64(iv), 'c': b64(ct)}, open(os.path.join(pasta, fid + '.json'), 'w'))
+        res['clientes_com_acesso'] += 1
+        res['processos_disponiveis'] += len(procs)
+    open(os.path.join(pasta, '.keep'), 'w').close()
     json.dump({'atualizado': datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')}, open(os.path.join(saida, 'atualizado.json'), 'w'))
     return res
 
@@ -118,5 +136,5 @@ if __name__ == '__main__':
     if '--entrada' in args:
         i = args.index('--entrada'); ent = args[i + 1]; del args[i:i + 2]
     r = gerar(carregar(args[0], ent), args[1])
-    r['sem_cpf'] = sorted(set(r['sem_cpf']))
+    r['sem_cpf'] = sorted(set(r['sem_cpf'])); r['sem_senha'] = sorted(set(r['sem_senha']))
     print(json.dumps(r, ensure_ascii=False, indent=1))

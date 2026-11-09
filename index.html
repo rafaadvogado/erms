@@ -161,7 +161,7 @@ const LOGO="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADPCAIAAABEG8u9AA
 const SEED={pessoas:[],processos:[],andamentos:[],prazos:[],conversas:[],leads:[],honorarios:[],config:{}};
 const ME={nome:'Rafael de Mello Souza',oab:'OAB/SP nº 352.797',tel:'(14) 99611-9228',wa:'5514996119228',email:'rafaelmsouza@adv.oabsp.org.br',site:'rafaelmsouza.adv.br'};
 const KEY='erms_app_v1';
-const COLS=['pessoas','processos','andamentos','prazos','conversas','leads','honorarios'];
+const COLS=['pessoas','processos','andamentos','prazos','conversas','leads','honorarios','portal'];
 
 /* ---------- utilidades ---------- */
 const $=s=>document.querySelector(s);
@@ -260,7 +260,7 @@ const OPT={
  forma:['PIX','Transferência','Boleto','Dinheiro','Cartão','Cheque','Alvará','RPV / Precatório','Outro'],
  minhaParte:['100%','50%','1/3']};
 const SCHEMA={
- pessoas:[{k:'nome',l:'Nome / Razão social',req:1,w:2},{k:'tipo',l:'Tipo',t:'sel',o:OPT.tipoPessoa,def:'Cliente'},{k:'doc',l:'CPF / CNPJ'},{k:'telefone',l:'Telefone / WhatsApp'},{k:'email',l:'E-mail'},{k:'nascimento',l:'Nascimento',t:'date'},{k:'profissao',l:'Profissão'},{k:'nb',l:'NIT / NB (INSS)'},{k:'senhaPortal',l:'Senha do portal do cliente (vazio = 1988)',t:'text'},{k:'endereco',l:'Endereço',w:2},{k:'obs',l:'Observações',t:'area',w:2}],
+ pessoas:[{k:'nome',l:'Nome / Razão social',req:1,w:2},{k:'tipo',l:'Tipo',t:'sel',o:OPT.tipoPessoa,def:'Cliente'},{k:'doc',l:'CPF / CNPJ'},{k:'telefone',l:'Telefone / WhatsApp'},{k:'email',l:'E-mail'},{k:'nascimento',l:'Nascimento',t:'date'},{k:'profissao',l:'Profissão'},{k:'estadoCivil',l:'Estado civil',t:'sel',o:['Solteiro(a)','Casado(a)','União estável','Divorciado(a)','Separado(a)','Viúvo(a)']},{k:'nb',l:'NIT / NB (INSS)'},{k:'endereco',l:'Endereço',w:2},{k:'obs',l:'Observações',t:'area',w:2}],
  processos:[{k:'numero',l:'Número do processo'},{k:'status',l:'Situação cadastral',t:'sel',o:OPT.statusProc,def:'Ativo'},{k:'clienteId',l:'Cliente',t:'pessoa',req:1},{k:'polo',l:'Cliente é',t:'sel',o:OPT.polo},{k:'contrariaId',l:'Parte contrária',t:'pessoa'},{k:'area',l:'Área',t:'sel',o:OPT.area},{k:'acao',l:'Tipo de ação / objeto',w:2},{k:'tribunal',l:'Tribunal'},{k:'vara',l:'Vara / Órgão'},{k:'comarca',l:'Comarca / Subseção'},{k:'distribuicao',l:'Distribuição',t:'date'},{k:'valorCausa',l:'Valor da causa',t:'money'},{k:'pasta',l:'Pasta'},{k:'responsavel',l:'Advogado responsável'},{k:'parceiro',l:'Parceria (advogado ou escritório parceiro)',t:'list'},{k:'parceriaPct',l:'% dos honorários do parceiro',t:'number',min:0,max:100},{k:'dataEncerramento',l:'Data de encerramento',t:'date'},{k:'advContrario',l:'Advogado da parte contrária'},{k:'portal',l:'Portal do cliente (rafaelmsouza.adv.br)',t:'sel',o:['Mostrar','Ocultar'],def:'Mostrar'},{k:'situacao',l:'Situação atual (resumo para o cliente)',t:'area',w:2,rows:3},{k:'obs',l:'Observações internas',t:'area',w:2}],
  andamentos:[{k:'processoId',l:'Processo',t:'processo',req:1,w:2},{k:'data',l:'Data',t:'date',req:1,def:todayStr},{k:'descricao',l:'Andamento',t:'area',req:1,w:2,rows:3},{k:'_prazo',l:'Gerar prazo a partir deste andamento? Data final:',t:'date',virtual:1,newOnly:1},{k:'_prazoTit',l:'Título do prazo',virtual:1,newOnly:1}],
  prazos:[{k:'tipo',l:'Tipo',t:'sel',o:OPT.tipoPrazo,def:'Prazo'},{k:'data',l:'Data',t:'date',req:1},{k:'titulo',l:'Descrição',req:1,w:2},{k:'hora',l:'Hora',t:'time'},{k:'local',l:'Local / link'},{k:'processoId',l:'Processo',t:'processo',w:2},{k:'pessoaId',l:'Cliente / pessoa',t:'pessoa',w:2},{k:'obs',l:'Observações',t:'area',w:2},{k:'feito',l:'Cumprido',t:'check'}],
@@ -734,7 +734,7 @@ function mesclar(a, b) {
 function aplicarPacote(d, A, nome) {
   const agora = new Date().toISOString();
   const has = c => new Set(d[c].map(x => x.id));
-  ['pessoas', 'processos', 'andamentos', 'prazos', 'conversas', 'leads'].forEach(c => {
+  ['pessoas', 'processos', 'andamentos', 'prazos', 'conversas', 'leads', 'portal'].forEach(c => {
     if (!A[c]) return; const ids = has(c);
     A[c].forEach(x => { if (!ids.has(x.id) && !(d.excluidos || {})[x.id]) d[c].push({ ...x, criado: x.criado || agora, _m: agora }) });
   });
@@ -866,7 +866,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 08/11 19:57</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 08/11 22:13</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1218,6 +1218,121 @@ async function trafCarregar() {
 
 /* entra no menu, antes de "Meu cartão" */
 (() => { const i = NAV.findIndex(n => n[0] === 'cartao'); if (!NAV.some(n => n[0] === 'trafego')) NAV.splice(i < 0 ? NAV.length : i, 0, ['trafego', '📈', 'Tráfego do site']) })();
+
+/* ================= ERMS – Área do cliente do site (cadastros, aprovação e senhas) =================
+   O site nunca recebe a senha do cliente: guarda-se só a "chave do portal" {id, k}, derivada da senha no
+   aparelho de quem a cria. O intermediário (Cloudflare) usa essa chave para entregar, criptografados, os
+   processos de quem tem acesso ativo. */
+const PORTAL_ITER = 200000;
+async function portalChave(cpf, senha) {
+  const te = new TextEncoder(), m = String(cpf).replace(/\D/g, '') + '|' + senha;
+  const base = await crypto.subtle.importKey('raw', te.encode(m), 'PBKDF2', false, ['deriveBits']);
+  const d = async (sal, bits) => new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: te.encode(sal), iterations: PORTAL_ITER }, base, bits));
+  const [id, k] = await Promise.all([d('erms-portal-cli-v2', 128), d('erms-portal-key-v2', 256)]);
+  return { id: [...id].map(b => b.toString(16).padStart(2, '0')).join(''), k: btoa(String.fromCharCode(...k)) };
+}
+const SITE_URL = 'https://rafaelmsouza.adv.br';
+const soDig = s => String(s || '').replace(/\D/g, '');
+const pendentesPortal = () => db.portal.filter(r => r.status === 'Pendente');
+function acharPorCPF(cpf) { const c = soDig(cpf); return c ? db.pessoas.find(p => soDig(p.doc) === c) : null }
+function marcarTarefaPortal(pid) { db.prazos.filter(z => z.portalId === pid && !z.feito).forEach(z => { z.feito = true; z._m = new Date().toISOString() }) }
+const waPara = (tel, txt) => { let n = soDig(tel); if (n.length <= 11) n = '55' + n; return `https://wa.me/${n}?text=${encodeURIComponent(txt)}` };
+const msgLiberado = (nome, senha) => `Olá, ${String(nome).split(' ')[0]}! Seu acesso à Área do Cliente do escritório foi liberado. Acesse ${SITE_URL} → "Área do cliente" e entre com o seu CPF e ${senha ? 'a senha ' + senha + ' (guarde-a com cuidado)' : 'a senha que você criou'}. Lá você acompanha a situação e os andamentos dos seus processos. Qualquer dúvida, estou à disposição. Dr. Rafael de Mello Souza – OAB/SP 352.797`;
+
+/* ---------- tela: Cadastros do site ---------- */
+VIEWS.portal = () => {
+  const L = [...db.portal].sort((a, b) => (a.status === 'Pendente' ? 0 : 1) - (b.status === 'Pendente' ? 0 : 1) || String(b.enviado).localeCompare(String(a.enviado)));
+  const I = (l, v) => v ? `<div><dt>${l}</dt><dd>${esc(v)}</dd></div>` : '';
+  return `<div class="top"><div><h1>Cadastros do site</h1><div class="sub">Clientes que se cadastraram na Área do cliente de ${SITE_URL.replace('https://', '')}. Confira a identidade antes de aprovar.</div></div></div>
+  ${L.length ? L.map(r => {
+    const ex = acharPorCPF(r.cpf), pend = r.status === 'Pendente';
+    const end = [r.rua && `${r.rua}, ${r.numero}${r.complemento ? ' – ' + r.complemento : ''}`, r.bairro, r.cidade && `${r.cidade}-${r.uf}`, r.cep && 'CEP ' + r.cep].filter(Boolean).join(' · ');
+    return `<div class="card" style="${pend ? 'border-left:4px solid #e0b100' : ''}">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h2 style="margin:0">${esc(r.nome)}</h2><span class="tag ${pend ? 'y' : r.status === 'Aprovado' ? 'g' : 'n'}">${esc(r.status)}${r.decididoEm ? ' em ' + fd(r.decididoEm) : ''}</span></div>
+    <div class="sub">Enviado em ${fdt(r.enviado.replace('Z', '')).slice(0, 16)} · ${ex ? `CPF já cadastrado: <a href="#pessoa/${ex.id}">${esc(ex.nome)}</a>` : '<b>CPF novo</b> – será criado um cliente'}</div>
+    <dl class="info" style="margin-top:10px">${I('CPF', r.cpf)}${I('Nascimento', fd(r.nascimento))}${I('WhatsApp', r.telefone)}${I('E-mail', r.email)}${I('Endereço', end)}${I('Estado civil', r.estadoCivil)}${I('Profissão', r.profissao)}${I('Como conheceu', r.origem)}${I('Aceite LGPD', r.aceite ? fdt(r.aceite.em.replace('Z', '')).slice(0, 16) : '')}</dl>
+    ${pend ? `<div class="acts" style="margin-top:12px"><a class="btn" href="${waPara(r.telefone, `Olá, ${r.nome.split(' ')[0]}! Aqui é o Dr. Rafael de Mello Souza. Recebi o seu cadastro na Área do Cliente do meu site. Você confirma que foi você mesmo(a) que fez o cadastro?`)}" target="_blank">💬 Confirmar pelo WhatsApp</a>
+      <button class="pri" onclick="aprovarPortal('${r.id}')">✓ Aprovar e liberar acesso</button><button class="danger" onclick="recusarPortal('${r.id}')">Recusar</button></div>`
+      : r.status === 'Aprovado' ? `<div class="acts" style="margin-top:12px"><a class="btn" href="${waPara(r.telefone, msgLiberado(r.nome))}" target="_blank">💬 Avisar que o acesso foi liberado</a>${r.pessoaId ? `<a class="btn" href="#pessoa/${r.pessoaId}">Abrir cliente</a>` : ''}</div>` : ''}
+    </div>`}).join('') : '<div class="card empty">Nenhum cadastro recebido ainda. Quando um cliente se cadastrar no site, ele aparece aqui e cai uma tarefa no Painel.</div>'}`;
+};
+function aprovarPortal(id) {
+  if (bloqueado()) return;
+  const r = db.portal.find(x => x.id === id); if (!r || !r.chave) return;
+  let p = acharPorCPF(r.cpf); const novoCli = !p, agora = new Date().toISOString();
+  if (!confirm(`${novoCli ? 'Criar o cliente' : 'Atualizar o cadastro de'} ${r.nome} com os dados enviados e liberar o acesso ao site?`)) return;
+  if (!p) { p = { id: uid('pe'), nome: r.nome, tipo: 'Cliente', criado: agora }; db.pessoas.push(p) }
+  const end = `${r.rua}, ${r.numero}${r.complemento ? ' – ' + r.complemento : ''} – ${r.bairro}, ${r.cidade}-${r.uf}, CEP ${r.cep}`;
+  Object.assign(p, { doc: r.cpf, nascimento: r.nascimento || p.nascimento || '', telefone: r.telefone || p.telefone || '', email: r.email || p.email || '', endereco: end,
+    estadoCivil: r.estadoCivil || p.estadoCivil || '', profissao: r.profissao || p.profissao || '' });
+  if (!p.nome || novoCli) p.nome = r.nome;
+  p.obs = [p.obs, `Cadastro feito pelo site em ${fd(r.enviado.slice(0, 10))}${r.origem ? ' (como conheceu: ' + r.origem + ')' : ''}; nome informado: ${r.nome}.`].filter(Boolean).join('\n');
+  p.portalChave = { id: r.chave.id, k: r.chave.k, ativo: true, origem: 'site', desde: agora }; delete p.senhaPortal; p._m = agora;
+  Object.assign(r, { status: 'Aprovado', decididoEm: agora, pessoaId: p.id, _m: agora }); delete r.chave;
+  marcarTarefaPortal(id); save(); render();
+  toast('Acesso liberado. Avise o cliente pelo WhatsApp.');
+}
+function recusarPortal(id) {
+  if (bloqueado()) return;
+  const r = db.portal.find(x => x.id === id); if (!r) return;
+  if (!confirm(`Recusar o cadastro de ${r.nome}? Ele não terá acesso.`)) return;
+  const agora = new Date().toISOString(); Object.assign(r, { status: 'Recusado', decididoEm: agora, _m: agora }); delete r.chave;
+  marcarTarefaPortal(id); save(); render();
+}
+
+/* ---------- no cadastro do cliente: acesso ao site ---------- */
+async function gerarSenhaPortal(pid) {
+  if (bloqueado()) return;
+  const p = byId('pessoas', pid); if (!p) return;
+  if (soDig(p.doc).length !== 11) { alert('Cadastre o CPF do cliente primeiro (✎ Editar → CPF / CNPJ).'); return }
+  if (p.portalChave && p.portalChave.ativo !== false && !confirm('Este cliente já tem acesso. Gerar uma senha nova? A senha anterior deixará de funcionar.')) return;
+  const senha = String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);
+  toast('Gerando acesso…');
+  const ch = await portalChave(p.doc, senha);
+  p.portalChave = { ...ch, ativo: true, origem: 'escritório', desde: new Date().toISOString() }; p.senhaPortal = senha; p._m = new Date().toISOString();
+  save(); render();
+}
+function bloquearPortal(pid) {
+  const p = byId('pessoas', pid); if (!p || !p.portalChave) return;
+  if (!confirm('Bloquear o acesso deste cliente ao site?')) return;
+  p.portalChave.ativo = false; p._m = new Date().toISOString(); save(); render();
+}
+function acessoSiteHtml(p) {
+  const pc = p.portalChave, ativo = pc && pc.ativo !== false;
+  const temProc = db.processos.some(x => x.clienteId === p.id);
+  if (!temProc && !pc) return '';
+  return `<div class="card" style="padding:12px 16px"><b>🌐 Área do cliente no site:</b> ${ativo ? `<span class="tag g">acesso liberado</span> <span class="sub">desde ${fd(pc.desde)} · ${pc.origem === 'site' ? 'senha criada pelo cliente' : 'senha gerada pelo escritório' + (p.senhaPortal ? ': <b>' + esc(p.senhaPortal) + '</b>' : '')}</span>` : pc ? '<span class="tag n">bloqueado</span>' : '<span class="sub">sem acesso (o cliente pode se cadastrar no site, ou gere uma senha)</span>'}
+  <div class="acts" style="margin-top:8px">${p.telefone && ativo ? `<a class="btn" href="${waPara(p.telefone, msgLiberado(p.nome, p.senhaPortal))}" target="_blank">💬 Enviar acesso pelo WhatsApp</a>` : ''}<button onclick="gerarSenhaPortal('${p.id}')">🔑 ${ativo ? 'Gerar nova senha' : 'Gerar senha de acesso'}</button>${ativo ? `<button onclick="bloquearPortal('${p.id}')">Bloquear</button>` : ''}</div></div>`;
+}
+const _pessoaBase = VIEWS.pessoa;
+VIEWS.pessoa = id => { const h = _pessoaBase(id), p = byId('pessoas', id); return p ? h.replace('<div class="tabs">', acessoSiteHtml(p) + '<div class="tabs">') : h };
+
+/* ---------- aviso no Painel e item no menu ---------- */
+const _painelBase = VIEWS.painel;
+VIEWS.painel = a => { const n = pendentesPortal().length, h = _painelBase(a); return n ? h.replace('<div class="stats">', `<div class="banner" style="background:#fff4d6;border:1px solid #e9c46a;border-radius:12px;padding:12px 14px;margin-bottom:14px">📝 <b>${n} cadastro${n > 1 ? 's' : ''} do site aguardando aprovação.</b> <a href="#portal">Ver e aprovar →</a></div><div class="stats">`) : h };
+(() => { const i = NAV.findIndex(n => n[0] === 'trafego'); if (!NAV.some(n => n[0] === 'portal')) NAV.splice(i < 0 ? NAV.length : i, 0, ['portal', '📝', 'Cadastros do site']) })();
+
+/* ---------- Backup e ajustes: chave do Dropbox para o intermediário do site ---------- */
+const _cfgPortal = VIEWS.config;
+VIEWS.config = () => _cfgPortal() + `<div class="card"><h2>🌐 Chave do site (Cloudflare)</h2>
+<p class="sub">Usada uma única vez, ao instalar o intermediário do site no Cloudflare. Ela dá ao intermediário acesso à pasta do ERMS no Dropbox, para gravar os cadastros e mostrar os processos aos clientes aprovados. Não a envie a ninguém nem a cole em conversas.</p>
+<div class="acts"><button onclick="chaveSitePasso1()">1. Abrir o Dropbox e autorizar</button></div><div id="chSite" style="margin-top:10px"></div></div>`;
+async function chaveSitePasso1() {
+  const { v, c } = await pkce(); localStorage.setItem('erms_site_ver', v);
+  const url = 'https://www.dropbox.com/oauth2/authorize?' + new URLSearchParams({ client_id: DBX_APP_KEY, response_type: 'code', code_challenge: c, code_challenge_method: 'S256', token_access_type: 'offline' });
+  $('#chSite').innerHTML = `<p><a class="btn pri" href="${url}" target="_blank" rel="noopener">Abrir o Dropbox</a></p><p class="sub">Toque em Permitir, copie o código que o Dropbox mostrar e cole aqui:</p>
+  <div class="acts"><input id="chCod" placeholder="código do Dropbox" style="flex:1;min-width:220px"><button class="pri" onclick="chaveSitePasso2()">2. Gerar a chave</button></div>`;
+}
+async function chaveSitePasso2() {
+  const code = $('#chCod').value.trim(); if (!code) return;
+  try {
+    const r = await fetch('https://api.dropboxapi.com/oauth2/token', { method: 'POST', body: new URLSearchParams({ code, grant_type: 'authorization_code', client_id: DBX_APP_KEY, code_verifier: localStorage.getItem('erms_site_ver') || '' }) });
+    const j = await r.json(); if (!r.ok || !j.refresh_token) throw new Error(j.error_description || j.error || 'HTTP ' + r.status);
+    localStorage.removeItem('erms_site_ver');
+    $('#chSite').innerHTML = `<p><b>Chave gerada.</b> Copie e cole no Cloudflare, no campo <b>DBX_REFRESH</b> (tipo Secret):</p><textarea readonly rows="3" style="width:100%;font-family:monospace" onclick="this.select()">${esc(j.refresh_token)}</textarea>
+    <div class="acts"><button onclick="navigator.clipboard.writeText(${JSON.stringify(j.refresh_token)}).then(()=>toast('Copiada.'))">📋 Copiar</button></div><p class="sub">Depois de colar no Cloudflare, saia desta tela: a chave não fica guardada no ERMS.</p>`;
+  } catch (e) { alert('Não foi possível gerar: ' + e.message) }
+}
 
 render();initDropbox();
 </script>
