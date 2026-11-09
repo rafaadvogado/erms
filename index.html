@@ -866,7 +866,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 08/11 22:13</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 09/11 07:57</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
