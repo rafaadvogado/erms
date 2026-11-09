@@ -866,7 +866,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 09/11 07:57</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 09/11 08:10</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1329,8 +1329,8 @@ async function chaveSitePasso2() {
     const r = await fetch('https://api.dropboxapi.com/oauth2/token', { method: 'POST', body: new URLSearchParams({ code, grant_type: 'authorization_code', client_id: DBX_APP_KEY, code_verifier: localStorage.getItem('erms_site_ver') || '' }) });
     const j = await r.json(); if (!r.ok || !j.refresh_token) throw new Error(j.error_description || j.error || 'HTTP ' + r.status);
     localStorage.removeItem('erms_site_ver');
-    $('#chSite').innerHTML = `<p><b>Chave gerada.</b> Copie e cole no Cloudflare, no campo <b>DBX_REFRESH</b> (tipo Secret):</p><textarea readonly rows="3" style="width:100%;font-family:monospace" onclick="this.select()">${esc(j.refresh_token)}</textarea>
-    <div class="acts"><button onclick="navigator.clipboard.writeText(${JSON.stringify(j.refresh_token)}).then(()=>toast('Copiada.'))">📋 Copiar</button></div><p class="sub">Depois de colar no Cloudflare, saia desta tela: a chave não fica guardada no ERMS.</p>`;
+    $('#chSite').innerHTML = `<p><b>Chave gerada.</b> Copie e cole no Cloudflare, no campo <b>DBX_REFRESH</b> (tipo Secret):</p><textarea id="chTok" readonly rows="3" style="width:100%;font-family:monospace" onclick="this.select()">${esc(j.refresh_token)}</textarea>
+    <div class="acts"><button onclick="navigator.clipboard.writeText($('#chTok').value.trim()).then(()=>toast('Chave copiada.'))">📋 Copiar</button></div><p class="sub">Depois de colar no Cloudflare, saia desta tela: a chave não fica guardada no ERMS.</p>`;
   } catch (e) { alert('Não foi possível gerar: ' + e.message) }
 }
 
