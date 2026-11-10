@@ -1,5 +1,5 @@
 // ERMS – service worker: guarda o programa para abrir sem internet. Nunca guarda dados do Dropbox.
-const CACHE = 'erms-20261110002032';
+const CACHE = 'erms-20261110084818';
 const ARQS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQS.map(a => new Request(a, { cache: 'reload' })))).then(() => self.skipWaiting())) });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())) });
