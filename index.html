@@ -937,7 +937,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 00:17 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 00:20 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1041,6 +1041,23 @@ const IA_TOOLS = {
       }, required: ['tipo', 'titulo', 'obs']
     }
   },
+  conversas: {
+    name: 'registrar_conversa', description: 'Registra no ERMS uma conversa com cliente extraída do material enviado (print de WhatsApp, e-mail, anotação).',
+    input_schema: {
+      type: 'object', properties: {
+        cliente: { type: 'string', description: 'Nome do cliente com quem o advogado conversou (o contato do print, não o advogado).' },
+        telefone: { type: 'string', description: 'Telefone do contato, se aparecer no print (com DDD).' },
+        numero_processo: { type: 'string', description: 'Número CNJ do processo, se mencionado. Vazio se não houver.' },
+        canal: { type: 'string', enum: [...OPT.canal, ''] },
+        data_hora: { type: 'string', description: 'AAAA-MM-DDTHH:MM da conversa (horário da última mensagem relevante). Vazio se não aparecer.' },
+        assunto: { type: 'string', description: 'Assunto em poucas palavras (ex.: "Dúvida sobre a perícia", "Envio de documentos").' },
+        resumo: { type: 'string', description: 'O que foi conversado, fiel ao material, em 2 a 6 frases objetivas, indicando quem disse o quê quando importante.' },
+        proximo: { type: 'string', description: 'O que ficou combinado ou o próximo passo (ex.: cliente vai enviar o laudo; advogado vai retornar). Vazio se nada.' },
+        retorno: { type: 'string', description: 'AAAA-MM-DD, se ficou combinado retornar ao cliente em uma data (ou "amanhã", "segunda" etc., converta). Vazio se não.' },
+        alertas: { type: 'string', description: 'O que o advogado deve conferir (ex.: cliente não identificado, prazo mencionado). Vazio se nenhum.' }
+      }, required: ['resumo']
+    }
+  },
   leads: {
     name: 'lancar_lead', description: 'Registra no ERMS um potencial cliente (lead) extraído do material enviado.',
     input_schema: {
@@ -1062,6 +1079,7 @@ const IA_TOOLS = {
 function iaSistema(col) {
   const hoje = todayStr(), dia = new Date().toLocaleDateString('pt-BR', { weekday: 'long' });
   const base = `Você é o assistente do ERMS, sistema do escritório do advogado Rafael de Mello Souza (OAB/SP 352.797, Bauru-SP; atua principalmente em Previdenciário, Cível e Trabalhista). Hoje é ${dia}, ${hoje}. Leia o texto e/ou as imagens (prints de WhatsApp, intimações, e-mails, PDFs fotografados) e chame a ferramenta com os dados. Seja fiel ao material: não invente nomes, números, datas ou conteúdo de decisões. Datas sem ano: use o ano mais provável perto de hoje. Escreva em português do Brasil.`;
+  if (col === 'conversas') return base + ` Trata-se do REGISTRO DE UMA CONVERSA do advogado com um cliente (normalmente prints do WhatsApp). Em prints do WhatsApp, as mensagens à direita (verdes) são do advogado e as da esquerda são do cliente; o nome ou número no topo é o contato. Resuma com fidelidade o que o cliente perguntou ou informou e o que o advogado respondeu. Canal: "WhatsApp" para prints do WhatsApp. Se o cliente mencionar prazo, audiência, perícia ou documento importante, avise em alertas.`;
   if (col === 'leads') return base + ` Trata-se de um NOVO CONTATO (lead). Mensagem recebida por WhatsApp → origem "WhatsApp", salvo se o texto indicar outra (indicação, Instagram...). Classifique a área pelo assunto (ex.: LOAS, aposentadoria, auxílio-doença, BPC → Previdenciário).`;
   return base + ` Trata-se de um PRAZO ou COMPROMISSO. Regras:
 - Intimação/publicação com prazo a contar: tipo "Prazo", "data" vazia, informe data_disponibilizacao e/ou data_publicacao e dias_uteis; o ERMS calcula a data final. Use o prazo fixado no ato; se não houver, o legal: recurso inominado (JEF/JEC) 10; apelação, agravo de instrumento, contrarrazões, contestação/réplica e manifestação sobre laudo 15; embargos de declaração 5; ato sem prazo expresso 5 (CPC 218 §3º); Justiça do Trabalho: recurso ordinário e contrarrazões 8, embargos 5. Prazos do processo eletrônico em dias úteis.
@@ -1112,6 +1130,18 @@ function iaAcharPessoa(nome) {
 function iaMontar(col, x) {
   const avisos = [], rec = {};
   if (x.alertas) avisos.push(x.alertas);
+  if (col === 'conversas') {
+    const proc = iaAcharProcesso(x.numero_processo);
+    const tel = String(x.telefone || '').replace(/\D/g, '').slice(-8);
+    const porTel = tel.length === 8 ? db.pessoas.filter(p => String(p.telefone || '').replace(/\D/g, '').slice(-8) === tel) : [];
+    const pes = proc ? byId('pessoas', proc.clienteId) : porTel.length === 1 ? porTel[0] : iaAcharPessoa(x.cliente);
+    if (!pes) avisos.push(`Não identifiquei o cliente${x.cliente ? ' "' + x.cliente + '"' : ''}${x.telefone ? ' (' + x.telefone + ')' : ''} no ERMS: escolha no campo Cliente.`);
+    if (x.numero_processo && !proc) avisos.push(`O processo ${x.numero_processo} não está cadastrado no ERMS.`);
+    Object.assign(rec, { canal: x.canal || 'WhatsApp', pessoaId: pes ? pes.id : '', processoId: proc ? proc.id : '', assunto: x.assunto || '', resumo: x.resumo || '', proximo: x.proximo || '' });
+    if (/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(x.data_hora || '')) rec.dataHora = x.data_hora.slice(0, 16);
+    if (/^\d{4}-\d\d-\d\d$/.test(x.retorno || '')) rec.retorno = x.retorno;
+    return { rec, avisos };
+  }
   if (col === 'leads') {
     Object.assign(rec, { nome: x.nome || '', telefone: x.telefone || '', email: x.email || '', origem: x.origem || '', area: x.area || '', assunto: x.assunto || '', etapa: 'Novo', obs: x.obs || '' });
     if (x.proximo_contato) rec.proximoContato = x.proximo_contato;
@@ -1143,17 +1173,19 @@ function iaMontar(col, x) {
 }
 
 /* ---------- caixa "Preencher com IA" nos formulários de Novo lead / Novo prazo ---------- */
+let IA_PRESET = null;
 const _openFormBase = openForm;
 openForm = function (title, col, rec, opts = {}) {
   _openFormBase(title, col, rec, opts);
-  if (!['leads', 'prazos'].includes(col) || (rec && rec.id)) return;
+  if (!['leads', 'prazos', 'conversas'].includes(col) || (rec && rec.id) || opts.schema) return;
+  IA_PRESET = Object.assign({}, rec || {});
   const frm = $('#frm'); if (!frm) return;
   const box = document.createElement('div'); box.className = 'w2'; box.id = 'iabox';
   box.style.cssText = 'grid-column:1/-1;background:#f3ecdf;border:1px solid #e2d6bf;border-radius:10px;padding:10px 12px;margin-bottom:4px';
   box.innerHTML = opts.iaAvisos !== undefined
     ? `<b>✨ Preenchido com IA – confira tudo antes de salvar.</b>${opts.iaAvisos.length ? '<ul style="margin:6px 0 0 18px;padding:0">' + opts.iaAvisos.map(a => `<li>${esc(a)}</li>`).join('') + '</ul>' : ''}`
     : `<b>✨ Preencher com IA</b> <span class="sub">– cole o texto e/ou envie prints; a IA preenche o formulário para você conferir.</span>
-      <textarea id="iaTxt" rows="3" style="width:100%;margin-top:6px;box-sizing:border-box" placeholder="${col === 'leads' ? 'Cole aqui a mensagem do WhatsApp, e-mail…' : 'Cole aqui a intimação, publicação, despacho…'}"></textarea>
+      <textarea id="iaTxt" rows="3" style="width:100%;margin-top:6px;box-sizing:border-box" placeholder="${col === 'leads' ? 'Cole aqui a mensagem do WhatsApp, e-mail…' : col === 'conversas' ? 'Cole a conversa ou escreva um resumo rápido… (ou só envie os prints)' : 'Cole aqui a intimação, publicação, despacho…'}"></textarea>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
         <label class="btn" style="cursor:pointer">📷 Imagens / prints<input id="iaImg" type="file" accept="image/*" multiple style="display:none" onchange="$('#iaQt').textContent=this.files.length?this.files.length+' imagem(ns)':''"></label>
         <span id="iaQt" class="sub"></span><span class="grow" style="flex:1"></span>
@@ -1173,6 +1205,8 @@ async function iaPreencher(col) {
     st.textContent = '⏳ A IA está analisando…';
     const x = await iaChamar(col, texto, imgs);
     const { rec, avisos } = iaMontar(col, x);
+    const pre = IA_PRESET || {}; ['pessoaId', 'processoId', 'leadId'].forEach(k => { if (pre[k]) rec[k] = pre[k] });
+    if (pre.pessoaId && avisos.length) for (let i = avisos.length - 1; i >= 0; i--) if (/^Não identifiquei o cliente/.test(avisos[i])) avisos.splice(i, 1);
     closeModal();
     openForm(NOVO[col] + ' (IA)', col, rec, { iaAvisos: avisos });
   } catch (e) { st.textContent = '⚠️ ' + e.message; bt.disabled = false }
@@ -1181,7 +1215,7 @@ async function iaPreencher(col) {
 /* ---------- ajustes: chave da API ---------- */
 const _cfgBase = VIEWS.config;
 VIEWS.config = () => _cfgBase() + `<div class="card"><h2>✨ IA (API do Claude)</h2>
-<p class="sub">Usada no botão "Preencher com IA" de Novo lead e Novo prazo. A chave fica guardada só neste aparelho (cadastre no celular e no computador). Crie em <b>console.anthropic.com</b> → API Keys.</p>
+<p class="sub">Usada no botão "Preencher com IA" de Novo lead, Novo prazo e Registrar conversa. A chave fica guardada só neste aparelho (cadastre no celular e no computador). Crie em <b>console.anthropic.com</b> → API Keys.</p>
 ${iaChave() ? `<p>Chave cadastrada: <b>…${esc(iaChave().slice(-6))}</b></p><div class="acts"><button onclick="iaTestar()">Testar</button><button onclick="if(confirm('Remover a chave deste aparelho?')){localStorage.removeItem(IA_KEY);render()}">Remover</button></div>`
   : `<div class="acts"><input id="iaKeyIn" type="password" placeholder="sk-ant-…" autocomplete="off" style="flex:1;min-width:220px"><button class="pri" onclick="const v=$('#iaKeyIn').value.trim();if(!/^sk-ant-/.test(v)){alert('A chave começa com sk-ant-');return}localStorage.setItem(IA_KEY,v);render();iaTestar()">Salvar</button></div>`}
 <div id="iaTst" class="sub" style="margin-top:6px"></div></div>`;
