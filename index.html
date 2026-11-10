@@ -937,7 +937,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 09/11 13:02 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 00:09 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1310,7 +1310,8 @@ function nProc(pid) { return db.processos.filter(x => ehCli(x, pid)).length }
 /* clientes com o mesmo nome (sem CPF ou com o mesmo CPF), mais processos primeiro */
 function candidatosNome(nome, cpf, exceto) {
   const k = nomeChave(nome), c = soDig(cpf); if (!k) return [];
-  return db.pessoas.filter(p => p.id !== exceto && nomeChave(p.nome) === k).sort((a, b) => (!soDig(a.doc) || soDig(a.doc) === c ? 0 : 1) - (!soDig(b.doc) || soDig(b.doc) === c ? 0 : 1) || nProc(b.id) - nProc(a.id));
+  const mesmo = n => { const x = nomeChave(n); return x === k || (x.split(' ').length >= 3 && k.split(' ').length >= 3 && (x.startsWith(k + ' ') || k.startsWith(x + ' '))) };
+  return db.pessoas.filter(p => p.id !== exceto && mesmo(p.nome)).sort((a, b) => (!soDig(a.doc) || soDig(a.doc) === c ? 0 : 1) - (!soDig(b.doc) || soDig(b.doc) === c ? 0 : 1) || nProc(b.id) - nProc(a.id));
 }
 /* junta o cadastro "de" dentro do "para": vínculos, dados que faltam e acesso ao site; depois apaga o "de" */
 function juntarPessoas(deId, paraId) {
@@ -1319,6 +1320,7 @@ function juntarPessoas(deId, paraId) {
   COLS.forEach(c => (db[c] || []).forEach(x => { let m = false; ['pessoaId', 'clienteId', 'contrariaId'].forEach(f => { if (x[f] === deId) { x[f] = paraId; m = true } }); if (Array.isArray(x.outrosClientes) && x.outrosClientes.includes(deId)) { x.outrosClientes = [...new Set(x.outrosClientes.map(o => o === deId ? paraId : o))].filter(o => o !== x.clienteId); m = true } if (m) x._m = agora }));
   ['doc', 'nascimento', 'telefone', 'email', 'endereco', 'estadoCivil', 'profissao'].forEach(f => { if (de[f]) para[f] = de[f] });
   if (de.obs) para.obs = [para.obs, de.obs].filter(Boolean).join('\n');
+  { const a = nomeChave(para.nome), b = nomeChave(de.nome); if (b.length > a.length && b.startsWith(a + ' ')) para.nome = de.nome }
   if (de.portalChave) { para.portalChave = de.portalChave; if (de.senhaPortal) para.senhaPortal = de.senhaPortal; else delete para.senhaPortal }
   para._m = agora; db.pessoas.splice(db.pessoas.indexOf(de), 1);
 }
