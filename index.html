@@ -939,7 +939,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 08:48 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 09:33 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1533,6 +1533,51 @@ async function preencherAcessosPessoa(pid) {
   const i = NAV.findIndex(n => n[0] === 'trafego'); if (!NAV.some(n => n[0] === 'acessos')) NAV.splice(i < 0 ? NAV.length : i, 0, ['acessos', '👁', 'Acessos dos clientes']);
 })();
 
+/* ===== Notificações: avisa quando chega prazo/tarefa novo (automação, site, outro aparelho) ===== */
+const NOTIF_KEY = 'erms_prazos_vistos', NOTIF_ON = 'erms_notif';
+function prazosVistos() { try { return new Set(JSON.parse(localStorage.getItem(NOTIF_KEY)) || []) } catch (e) { return null } }
+function gravarVistos(S) { try { localStorage.setItem(NOTIF_KEY, JSON.stringify([...S].slice(-5000))) } catch (e) { } }
+function marcarTodosVistos() { const S = prazosVistos() || new Set(); db.prazos.forEach(z => S.add(z.id)); gravarVistos(S) }
+function notifAtiva() { return localStorage.getItem(NOTIF_ON) === '1' && 'Notification' in window && Notification.permission === 'granted' }
+async function mostrarNotif(titulo, corpo, url, tag) {
+  try {
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    const op = { body: corpo, tag, icon: 'icon-192.png', badge: 'icon-192.png', data: { url } };
+    if (reg && reg.showNotification) await reg.showNotification(titulo, op); else new Notification(titulo, op);
+  } catch (e) { console.warn('notificação', e) }
+}
+function verificarNovosPrazos() {
+  const S = prazosVistos();
+  if (!S || localStorage.getItem(NOTIF_KEY) === null) { marcarTodosVistos(); return }   // primeira vez neste aparelho: só registra
+  const novos = db.prazos.filter(z => !S.has(z.id));
+  if (!novos.length) return;
+  novos.forEach(z => S.add(z.id)); gravarVistos(S);
+  const pend = novos.filter(z => !z.feito);
+  if (!pend.length || !notifAtiva()) return;
+  const desc = z => `${fd(z.data)}${z.hora ? ' ' + z.hora : ''} – ${String(z.titulo || '').replace(/^⚠️?\s*/, '')}${z.pessoaId ? ' (' + nomeP(z.pessoaId) + ')' : ''}`;
+  if (pend.length === 1) { const z = pend[0]; mostrarNotif(`Novo ${String(z.tipo || 'prazo').toLowerCase()} no ERMS`, desc(z), './#prazos', 'erms-' + z.id) }
+  else mostrarNotif(`${pend.length} prazos/tarefas novos no ERMS`, pend.slice(0, 4).map(desc).join('\n') + (pend.length > 4 ? `\n+ ${pend.length - 4}` : ''), './#prazos', 'erms-lote-' + Date.now());
+}
+async function ativarNotif() {
+  if (!('Notification' in window)) { alert(/iPhone|iPad/.test(navigator.userAgent) ? 'No iPhone, as notificações só funcionam com o ERMS instalado na Tela de Início (Compartilhar → Adicionar à Tela de Início), aberto por lá.' : 'Este navegador não permite notificações.'); return }
+  const p = await Notification.requestPermission();
+  if (p !== 'granted') { alert('As notificações foram bloqueadas. Libere nas configurações do navegador/celular para o ERMS.'); render(); return }
+  localStorage.setItem(NOTIF_ON, '1'); marcarTodosVistos(); render();
+  mostrarNotif('Notificações ativadas', 'O ERMS vai avisar aqui quando chegar um prazo ou tarefa novo.', './#painel', 'erms-teste');
+}
+function desativarNotif() { localStorage.removeItem(NOTIF_ON); render() }
+(() => {
+  // o que é criado neste aparelho não gera aviso
+  const _save = save; save = function () { const r = _save.apply(this, arguments); try { marcarTodosVistos() } catch (e) { } return r };
+  // confere após cada sincronização (o render é chamado depois) e a cada 30 s
+  const _render = render; render = function () { try { verificarNovosPrazos() } catch (e) { } return _render.apply(this, arguments) };
+  setInterval(() => { try { verificarNovosPrazos() } catch (e) { } }, 30000);
+  const _cfg = VIEWS.config;
+  VIEWS.config = () => _cfg() + `<div class="card"><h2>🔔 Notificações</h2><p class="sub">Avisa neste aparelho quando chegar um prazo ou tarefa novo: lançado pela automação diária, por um cadastro do site ou pelo outro aparelho. No iPhone, só com o ERMS instalado na Tela de Início. O aviso chega enquanto o ERMS estiver aberto ou em segundo plano.</p>
+  ${notifAtiva() ? `<p><b>Ativadas neste aparelho.</b></p><div class="acts"><button onclick="mostrarNotif('Teste do ERMS','As notificações estão funcionando.','./#painel','erms-teste')">Testar</button><button onclick="desativarNotif()">Desativar</button></div>`
+      : `<div class="acts"><button class="pri" onclick="ativarNotif()">Ativar notificações</button></div>`}</div>`;
+})();
+
 /* ===== Ícones de traço fino no lugar dos emojis (celular e computador) =====
    Troca automaticamente, em toda a tela, os emojis conhecidos por ícones SVG de linha fina. */
 const ICO = {
@@ -1580,6 +1625,7 @@ const ICO = {
   '➕': '<path d="M12 5v14M5 12h14"/>',
   '🔑': '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14 9l2 2"/>',
   '📴': '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="m3 3 18 18"/>',
+  '🔔': '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
   '📰': '<path d="M4 4h13v16H6a2 2 0 0 1-2-2z"/><path d="M17 8h3v10a2 2 0 0 1-2 2M8 8h5M8 12h5M8 16h5"/>'
 };
 const ICO_RX = new RegExp('(' + Object.keys(ICO).map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')️?', 'gu');
