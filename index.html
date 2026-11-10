@@ -189,7 +189,7 @@ th{font-size:12px;color:var(--mut);font-weight:600;background:#faf8f3}
    <input type="search" id="q" placeholder="Buscar cliente, nº do processo, conversa…  (atalho: /)" onkeydown="if(event.key==='Enter'&&this.value.trim())go('busca/'+encodeURIComponent(this.value.trim()))">
    <span class="grow"></span>
    <span id="fstat" class="sub hide-m"></span>
-   <button class="big" onclick="novo('conversas')" title="Atalho: Alt+C">💬 Registrar conversa</button>
+   <button class="big" onclick="registrarIntimacao()" title="Atalho: Alt+I">📋 Registrar intimação</button>
   </header>
   <main id="main"></main>
  </div>
@@ -425,7 +425,7 @@ function fecharMais(){$('#mais').classList.remove('on')}
 const VIEWS={};
 function render(){const[v,id]=(location.hash.slice(1)||'painel').split('/');renderNav(v);const bn=$('#banner');if(bn)bn.style.display=(v==='painel'&&bn.querySelector('img').src.startsWith('data:image'))?'':'none';const fn=VIEWS[v]||VIEWS.painel;document.body.classList.toggle('consulta',CONSULTA);$('#main').innerHTML=(CONSULTA?consultaBanner():'')+fn(decodeURIComponent(id||''));setFstat()}
 window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0)});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#modal').classList.contains('on'))closeModal();const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);if(e.altKey&&(e.key==='c'||e.key==='C')){e.preventDefault();novo('conversas')}else if(e.key==='/'&&!typing){e.preventDefault();$('#q').focus()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#modal').classList.contains('on'))closeModal();const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);if(e.altKey&&(e.key==='c'||e.key==='C')){e.preventDefault();novo('conversas')}else if(e.altKey&&(e.key==='i'||e.key==='I')){e.preventDefault();registrarIntimacao()}else if(e.key==='/'&&!typing){e.preventDefault();$('#q').focus()}});
 const upd=fn=>{$('#lst').innerHTML=fn()};
 const aberto=l=>!['Fechado','Perdido'].includes(l.etapa);
 const quem=c=>c.pessoaId?nomeP(c.pessoaId):(byId('leads',c.leadId)?.nome||'');
@@ -462,7 +462,7 @@ VIEWS.painel=()=>{
  const ult=[...db.conversas].filter(c=>c.pessoaId).sort(by('dataHora')).reverse().slice(0,4);
  const novid=db.andamentos.filter(a=>a.data>=addDays(t,-7)).sort(by('data')).reverse();
  const ativos=db.processos.filter(p=>!p.status||p.status==='Ativo'||p.status==='Suspenso').length;
- let h=`<div class="top"><div><h1>${saud()}</h1><div class="sub">${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div><div class="acts"><button class="big" onclick="novo('conversas')">💬 Registrar conversa</button><button onclick="novo('prazos')">📅 Novo prazo</button><button onclick="novo('leads')">🎯 Novo lead</button></div></div>`;
+ let h=`<div class="top"><div><h1>${saud()}</h1><div class="sub">${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div><div class="acts"><button class="big" onclick="registrarIntimacao()">📋 Registrar intimação</button><button onclick="novo('conversas')">💬 Registrar conversa</button><button onclick="novo('prazos')">📅 Novo prazo</button><button onclick="novo('leads')">🎯 Novo lead</button></div></div>`;
  h+=backupBanner();
  h+=`<div class="stats"><div class="stat" onclick="go('processos')"><b>${ativos}</b><span>Processos ativos</span></div><div class="stat ${db.prazos.some(p=>!p.feito&&p.data<t)?'bad':''}" onclick="go('prazos')"><b>${db.prazos.filter(p=>!p.feito&&p.data<=w).length}</b><span>Prazos até 7 dias</span></div><div class="stat ${rtAll.some(c=>c.retorno<t)?'bad':''}" onclick="st.cr='p';go('conversas')"><b>${rtAll.length}</b><span>Retornos a clientes</span></div><div class="stat" onclick="go('leads')"><b>${db.leads.filter(aberto).length}</b><span>Leads em aberto</span></div><div class="stat ok" onclick="go('honorarios')"><b>${money(sum(recMes))}</b><span>Recebido no mês</span></div><div class="stat ${atras.length?'bad':''}" onclick="st.hs='atr';go('honorarios')"><b>${money(sum(atras))}</b><span>Honorários em atraso</span></div></div>`;
  h+=`<div class="cols"><div class="card"><h2>📅 Prazos e compromissos (atrasados e próximos 7 dias)</h2>${pz.map(prazoItem).join('')||'<div class="empty">Nada pendente nos próximos 7 dias.</div>'}</div><div class="card"><h2>📞 Retornos prometidos a clientes</h2>${rt.map(retornoItem).join('')||'<div class="empty">Nenhum retorno pendente. Ao registrar uma conversa, informe "Retornar ao cliente em" e ela aparece aqui.</div>'}</div></div>`;
@@ -939,7 +939,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 09:33 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 12:58 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1039,6 +1039,8 @@ const IA_TOOLS = {
         hora: { type: 'string', description: 'HH:MM, se houver.' },
         local: { type: 'string', description: 'Local, sala, endereço ou link, se houver.' },
         obs: { type: 'string', description: 'Resumo fiel do ato/decisão, fundamento do prazo e, para audiência/perícia, o que o cliente deve levar. Em português.' },
+        andamento: { type: 'string', description: 'Uma frase para o histórico do processo dizendo o que o ato decidiu ou determinou (ex.: "Sentença julgou procedente o pedido; INSS condenado a conceder o benefício"). Fiel ao texto.' },
+        situacao_cliente: { type: 'string', description: 'Opcional: 1 a 2 frases simples para o cliente leigo sobre a fase atual do processo após este ato. Vazio se não for relevante.' },
         alertas: { type: 'string', description: 'Dúvidas ou pontos que o advogado precisa conferir (ex.: data de publicação não aparece, prazo ambíguo). Vazio se nenhum.' }
       }, required: ['tipo', 'titulo', 'obs']
     }
@@ -1175,7 +1177,25 @@ function iaMontar(col, x) {
 }
 
 /* ---------- caixa "Preencher com IA" nos formulários de Novo lead / Novo prazo ---------- */
-let IA_PRESET = null;
+let IA_PRESET = null, INTIM = null;
+/* Registrar intimação: cola/print da intimação → IA gera o prazo e, ao salvar, lança o andamento no processo */
+function registrarIntimacao() {
+  _novoBase('prazos', {}); INTIM = { ativo: true };
+  const h = document.querySelector('#modal .mhead h3'); if (h) h.textContent = 'Registrar intimação';
+  const t = $('#iaTxt'); if (t) { t.placeholder = 'Cole aqui o texto da intimação/publicação (DJEN, Recorte Digital, e-mail do tribunal…) ou envie o print'; t.rows = 6; setTimeout(() => t.focus(), 60) }
+}
+const _novoBase = novo;
+novo = function () { INTIM = null; return _novoBase.apply(this, arguments) };
+const _hkPrazosAfter = HOOKS.prazos_after;
+HOOKS.prazos_after = function (rec, isNew, v) {
+  if (_hkPrazosAfter) _hkPrazosAfter(rec, isNew, v);
+  const I = INTIM; INTIM = null;
+  if (!I || !isNew || !rec.processoId) return;
+  const desc = (I.andamento || String(rec.titulo || '').replace(/^⚠\uFE0F?\s*conferir\s*–\s*/, '')).trim();
+  if (desc) db.andamentos.push({ id: uid(), criado: new Date().toISOString(), processoId: rec.processoId, data: I.data || todayStr(), descricao: desc, fonte: 'Intimação lançada no ERMS' });
+  if (I.situacao) { const p = byId('processos', rec.processoId); if (p) { p.situacao = I.situacao; p._m = new Date().toISOString() } }
+  setTimeout(() => toast('Prazo salvo e andamento lançado no processo.'), 50);
+};
 const _openFormBase = openForm;
 openForm = function (title, col, rec, opts = {}) {
   _openFormBase(title, col, rec, opts);
@@ -1207,17 +1227,19 @@ async function iaPreencher(col) {
     st.textContent = '⏳ A IA está analisando…';
     const x = await iaChamar(col, texto, imgs);
     const { rec, avisos } = iaMontar(col, x);
+    if (INTIM && col === 'prazos') Object.assign(INTIM, { andamento: x.andamento || '', situacao: x.situacao_cliente || '', data: x.data_publicacao || (x.data_disponibilizacao ? isoD(proxUtil(parseD(x.data_disponibilizacao), x.justica || 'federal')) : '') });
     const pre = IA_PRESET || {}; ['pessoaId', 'processoId', 'leadId'].forEach(k => { if (pre[k]) rec[k] = pre[k] });
     if (pre.pessoaId && avisos.length) for (let i = avisos.length - 1; i >= 0; i--) if (/^Não identifiquei o cliente/.test(avisos[i])) avisos.splice(i, 1);
     closeModal();
-    openForm(NOVO[col] + ' (IA)', col, rec, { iaAvisos: avisos });
+    if (INTIM && col === 'prazos' && !rec.processoId) avisos.unshift('Escolha o processo no campo Processo para o andamento ser lançado nele.');
+    openForm((INTIM && col === 'prazos' ? 'Registrar intimação' : NOVO[col]) + ' (IA)', col, rec, { iaAvisos: avisos });
   } catch (e) { st.textContent = '⚠️ ' + e.message; bt.disabled = false }
 }
 
 /* ---------- ajustes: chave da API ---------- */
 const _cfgBase = VIEWS.config;
 VIEWS.config = () => _cfgBase() + `<div class="card"><h2>✨ IA (API do Claude)</h2>
-<p class="sub">Usada no botão "Preencher com IA" de Novo lead, Novo prazo e Registrar conversa. A chave fica guardada só neste aparelho (cadastre no celular e no computador). Crie em <b>console.anthropic.com</b> → API Keys.</p>
+<p class="sub">Usada no botão "Preencher com IA" de Registrar intimação, Novo prazo, Novo lead e Registrar conversa. A chave fica guardada só neste aparelho (cadastre no celular e no computador). Crie em <b>console.anthropic.com</b> → API Keys.</p>
 ${iaChave() ? `<p>Chave cadastrada: <b>…${esc(iaChave().slice(-6))}</b></p><div class="acts"><button onclick="iaTestar()">Testar</button><button onclick="if(confirm('Remover a chave deste aparelho?')){localStorage.removeItem(IA_KEY);render()}">Remover</button></div>`
   : `<div class="acts"><input id="iaKeyIn" type="password" placeholder="sk-ant-…" autocomplete="off" style="flex:1;min-width:220px"><button class="pri" onclick="const v=$('#iaKeyIn').value.trim();if(!/^sk-ant-/.test(v)){alert('A chave começa com sk-ant-');return}localStorage.setItem(IA_KEY,v);render();iaTestar()">Salvar</button></div>`}
 <div id="iaTst" class="sub" style="margin-top:6px"></div></div>`;
