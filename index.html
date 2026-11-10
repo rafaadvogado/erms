@@ -189,7 +189,6 @@ th{font-size:12px;color:var(--mut);font-weight:600;background:#faf8f3}
    <input type="search" id="q" placeholder="Buscar cliente, nº do processo, conversa…  (atalho: /)" onkeydown="if(event.key==='Enter'&&this.value.trim())go('busca/'+encodeURIComponent(this.value.trim()))">
    <span class="grow"></span>
    <span id="fstat" class="sub hide-m"></span>
-   <button class="big" onclick="registrarIntimacao()" title="Atalho: Alt+I">📋 Registrar intimação</button>
   </header>
   <main id="main"></main>
  </div>
@@ -939,7 +938,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 13:01 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 13:08 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
