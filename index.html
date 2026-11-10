@@ -462,7 +462,7 @@ VIEWS.painel=()=>{
  const ult=[...db.conversas].filter(c=>c.pessoaId).sort(by('dataHora')).reverse().slice(0,4);
  const novid=db.andamentos.filter(a=>a.data>=addDays(t,-7)).sort(by('data')).reverse();
  const ativos=db.processos.filter(p=>!p.status||p.status==='Ativo'||p.status==='Suspenso').length;
- let h=`<div class="top"><div><h1>${saud()}</h1><div class="sub">${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div><div class="acts"><button class="big" onclick="registrarIntimacao()">📋 Registrar intimação</button><button onclick="novo('conversas')">💬 Registrar conversa</button><button onclick="novo('prazos')">📅 Novo prazo</button><button onclick="novo('leads')">🎯 Novo lead</button></div></div>`;
+ let h=`<div class="top"><div><h1>${saud()}</h1><div class="sub">${new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div></div><div class="acts"><button class="big" onclick="registrarIntimacao()">📋 Registrar intimação</button><button onclick="novo('prazos')">📅 Novo prazo</button><button onclick="novo('leads')">🎯 Novo lead</button></div></div>`;
  h+=backupBanner();
  h+=`<div class="stats"><div class="stat" onclick="go('processos')"><b>${ativos}</b><span>Processos ativos</span></div><div class="stat ${db.prazos.some(p=>!p.feito&&p.data<t)?'bad':''}" onclick="go('prazos')"><b>${db.prazos.filter(p=>!p.feito&&p.data<=w).length}</b><span>Prazos até 7 dias</span></div><div class="stat ${rtAll.some(c=>c.retorno<t)?'bad':''}" onclick="st.cr='p';go('conversas')"><b>${rtAll.length}</b><span>Retornos a clientes</span></div><div class="stat" onclick="go('leads')"><b>${db.leads.filter(aberto).length}</b><span>Leads em aberto</span></div><div class="stat ok" onclick="go('honorarios')"><b>${money(sum(recMes))}</b><span>Recebido no mês</span></div><div class="stat ${atras.length?'bad':''}" onclick="st.hs='atr';go('honorarios')"><b>${money(sum(atras))}</b><span>Honorários em atraso</span></div></div>`;
  h+=`<div class="cols"><div class="card"><h2>📅 Prazos e compromissos (atrasados e próximos 7 dias)</h2>${pz.map(prazoItem).join('')||'<div class="empty">Nada pendente nos próximos 7 dias.</div>'}</div><div class="card"><h2>📞 Retornos prometidos a clientes</h2>${rt.map(retornoItem).join('')||'<div class="empty">Nenhum retorno pendente. Ao registrar uma conversa, informe "Retornar ao cliente em" e ela aparece aqui.</div>'}</div></div>`;
@@ -939,7 +939,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 12:58 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 13:01 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1182,7 +1182,16 @@ let IA_PRESET = null, INTIM = null;
 function registrarIntimacao() {
   _novoBase('prazos', {}); INTIM = { ativo: true };
   const h = document.querySelector('#modal .mhead h3'); if (h) h.textContent = 'Registrar intimação';
+  ajustarFormIntim();
   const t = $('#iaTxt'); if (t) { t.placeholder = 'Cole aqui o texto da intimação/publicação (DJEN, Recorte Digital, e-mail do tribunal…) ou envie o print'; t.rows = 6; setTimeout(() => t.focus(), 60) }
+}
+/* caixa "já cumprida": usa o campo Cumprido do prazo, destacado no alto */
+function ajustarFormIntim() {
+  const frm = $('#frm'); if (!frm || !frm.elements.feito) return;
+  const lab = frm.elements.feito.closest('label'); if (!lab) return;
+  lab.innerHTML = `<input type="checkbox" name="feito" ${frm.elements.feito.checked ? 'checked' : ''}> <b>Já cumpri esta intimação</b> <span class="sub">– o ERMS lança a intimação e já dá a baixa no prazo</span>`;
+  lab.style.cssText = 'grid-column:1/-1;background:#eef3fb;border:1px solid #c9d6ee;border-radius:10px;padding:10px 12px';
+  const ref = $('#iabox'); ref && ref.nextSibling ? frm.insertBefore(lab, ref.nextSibling) : frm.insertBefore(lab, frm.firstChild);
 }
 const _novoBase = novo;
 novo = function () { INTIM = null; return _novoBase.apply(this, arguments) };
@@ -1193,8 +1202,9 @@ HOOKS.prazos_after = function (rec, isNew, v) {
   if (!I || !isNew || !rec.processoId) return;
   const desc = (I.andamento || String(rec.titulo || '').replace(/^⚠\uFE0F?\s*conferir\s*–\s*/, '')).trim();
   if (desc) db.andamentos.push({ id: uid(), criado: new Date().toISOString(), processoId: rec.processoId, data: I.data || todayStr(), descricao: desc, fonte: 'Intimação lançada no ERMS' });
+  if (rec.feito) { rec.obs = [rec.obs, 'Cumprida antes da intimação (registrado em ' + fd(todayStr()) + ').'].filter(Boolean).join('\n\n'); const z = byId('prazos', rec.id); if (z) z.obs = rec.obs }
   if (I.situacao) { const p = byId('processos', rec.processoId); if (p) { p.situacao = I.situacao; p._m = new Date().toISOString() } }
-  setTimeout(() => toast('Prazo salvo e andamento lançado no processo.'), 50);
+  setTimeout(() => toast(rec.feito ? 'Intimação lançada e já baixada como cumprida.' : 'Prazo salvo e andamento lançado no processo.'), 50);
 };
 const _openFormBase = openForm;
 openForm = function (title, col, rec, opts = {}) {
@@ -1227,12 +1237,14 @@ async function iaPreencher(col) {
     st.textContent = '⏳ A IA está analisando…';
     const x = await iaChamar(col, texto, imgs);
     const { rec, avisos } = iaMontar(col, x);
+    if (INTIM && col === 'prazos' && $('#frm') && $('#frm').elements.feito && $('#frm').elements.feito.checked) rec.feito = true;
     if (INTIM && col === 'prazos') Object.assign(INTIM, { andamento: x.andamento || '', situacao: x.situacao_cliente || '', data: x.data_publicacao || (x.data_disponibilizacao ? isoD(proxUtil(parseD(x.data_disponibilizacao), x.justica || 'federal')) : '') });
     const pre = IA_PRESET || {}; ['pessoaId', 'processoId', 'leadId'].forEach(k => { if (pre[k]) rec[k] = pre[k] });
     if (pre.pessoaId && avisos.length) for (let i = avisos.length - 1; i >= 0; i--) if (/^Não identifiquei o cliente/.test(avisos[i])) avisos.splice(i, 1);
     closeModal();
     if (INTIM && col === 'prazos' && !rec.processoId) avisos.unshift('Escolha o processo no campo Processo para o andamento ser lançado nele.');
     openForm((INTIM && col === 'prazos' ? 'Registrar intimação' : NOVO[col]) + ' (IA)', col, rec, { iaAvisos: avisos });
+    if (INTIM && col === 'prazos') ajustarFormIntim();
   } catch (e) { st.textContent = '⚠️ ' + e.message; bt.disabled = false }
 }
 
