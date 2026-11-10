@@ -4,6 +4,7 @@
 Uso: python3 gerar_youtube.py PASTA_SAIDA
 Saída: banner.png (2560x1440, conteúdo dentro da área segura central de 1546x423)
        perfil.png (800x800, pensado para o recorte redondo)
+       youtube-marca-dagua.png (150x150, PNG transparente, para Personalização > Branding > Marca d'água)
 """
 import os, subprocess, sys, tempfile
 
@@ -34,6 +35,16 @@ body{{width:800px;height:800px;background:radial-gradient(circle at 50% 42%,#1e3
 </style></head><body><div class="trama"></div><div class="c">{MONO}<div class="lin"></div><div class="oab">Advogado</div></div></body></html>"""
 
 
+def marca():
+    # marca d'água: selo redondo com fundo transparente fora do círculo (o YouTube mostra no canto do vídeo)
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>{BASE}
+html,body{{background:transparent!important;width:600px;height:600px}}
+.c{{position:absolute;inset:6px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#1e3d78 0,#0f1e3a 75%);
+border:14px solid #efe6d2;display:flex;align-items:center;justify-content:center}}
+.mono{{font-size:250px;margin-top:-22px}}
+</style></head><body><div class="c">{MONO}</div></body></html>"""
+
+
 def banner():
     # área segura do YouTube (visível em todos os aparelhos): 1546x423 no centro
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><style>{BASE}
@@ -56,11 +67,11 @@ body{{width:2560px;height:1440px;background:linear-gradient(180deg,#1e3d78 0,#16
 </body></html>"""
 
 
-def png(html_txt, destino, w, h):
+def png(html_txt, destino, w, h, transparente=False):
     with tempfile.NamedTemporaryFile('w', suffix='.html', delete=False, encoding='utf-8') as f:
         f.write(html_txt)
     subprocess.run([chrome(), '--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', '--force-device-scale-factor=1',
-                    f'--window-size={w},{h}', f'--screenshot={destino}', 'file://' + f.name], check=True, capture_output=True, timeout=120)
+                    f'--window-size={w},{h}', *(['--default-background-color=00000000'] if transparente else []), f'--screenshot={destino}', 'file://' + f.name], check=True, capture_output=True, timeout=120)
     os.unlink(f.name)
 
 
@@ -69,5 +80,11 @@ if __name__ == '__main__':
     os.makedirs(saida, exist_ok=True)
     png(banner(), os.path.join(saida, 'youtube-banner.png'), 2560, 1440)
     png(perfil(), os.path.join(saida, 'youtube-perfil.png'), 800, 800)
+    grande = os.path.join(saida, 'marca-600.png')
+    png(marca(), grande, 600, 600, transparente=True)
+    from PIL import Image
+    Image.open(grande).resize((150, 150), Image.LANCZOS).save(os.path.join(saida, 'youtube-marca-dagua.png'), optimize=True)
+    os.unlink(grande)
+    print(os.path.join(saida, 'youtube-marca-dagua.png'))
     print(os.path.join(saida, 'youtube-banner.png'))
     print(os.path.join(saida, 'youtube-perfil.png'))
