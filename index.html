@@ -938,7 +938,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 10/11 15:18 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 11/11 07:59 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1386,7 +1386,7 @@ function candidatosNome(nome, cpf, exceto) {
 function juntarPessoas(deId, paraId) {
   const de = byId('pessoas', deId), para = byId('pessoas', paraId); if (!de || !para || de === para) return;
   const agora = new Date().toISOString();
-  COLS.forEach(c => (db[c] || []).forEach(x => { let m = false; ['pessoaId', 'clienteId', 'contrariaId'].forEach(f => { if (x[f] === deId) { x[f] = paraId; m = true } }); if (Array.isArray(x.outrosClientes) && x.outrosClientes.includes(deId)) { x.outrosClientes = [...new Set(x.outrosClientes.map(o => o === deId ? paraId : o))].filter(o => o !== x.clienteId); m = true } if (m) x._m = agora }));
+  COLS.forEach(c => (db[c] || []).forEach(x => { let m = false; ['pessoaId', 'clienteId', 'contrariaId'].forEach(f => { if (x[f] === deId) { x[f] = paraId; m = true } }); if (Array.isArray(x.observadores) && x.observadores.includes(deId)) { x.observadores = [...new Set(x.observadores.map(o => o === deId ? paraId : o))]; m = true } if (Array.isArray(x.outrosClientes) && x.outrosClientes.includes(deId)) { x.outrosClientes = [...new Set(x.outrosClientes.map(o => o === deId ? paraId : o))].filter(o => o !== x.clienteId); m = true } if (m) x._m = agora }));
   ['doc', 'nascimento', 'telefone', 'email', 'endereco', 'estadoCivil', 'profissao'].forEach(f => { if (de[f]) para[f] = de[f] });
   if (de.obs) para.obs = [para.obs, de.obs].filter(Boolean).join('\n');
   { const a = nomeChave(para.nome), b = nomeChave(de.nome); if (b.length > a.length && b.startsWith(a + ' ')) para.nome = de.nome }
@@ -1475,7 +1475,7 @@ function bloquearPortal(pid) {
 }
 function acessoSiteHtml(p) {
   const pc = p.portalChave, ativo = pc && pc.ativo !== false;
-  const temProc = db.processos.some(x => ehCli(x, p.id));
+  const temProc = db.processos.some(x => ehCli(x, p.id) || (x.observadores || []).includes(p.id));
   const dup = !temProc && pc ? candidatosNome(p.nome, p.doc, p.id).filter(c => nProc(c.id)) : [];
   const avisoDup = dup.length ? `<div class="card" style="padding:12px 16px;border-left:4px solid #e0b100"><b>⚠️ Possível cadastro duplicado.</b> <span class="sub">Já existe outro cadastro com este nome e com processos:</span><div class="acts" style="margin-top:8px">${dup.map(c => `<button class="pri" onclick="juntarCadastro('${p.id}','${c.id}')">🔗 Juntar com ${esc(c.nome)} (${nProc(c.id)} processo(s))</button>`).join('')}</div></div>` : '';
   if (!temProc && !pc) return '';
@@ -1512,6 +1512,39 @@ async function chaveSitePasso2() {
     <div class="acts"><button onclick="navigator.clipboard.writeText($('#chTok').value.trim()).then(()=>toast('Chave copiada.'))">📋 Copiar</button></div><p class="sub">Depois de colar no Cloudflare, saia desta tela: a chave não fica guardada no ERMS.</p>`;
   } catch (e) { alert('Não foi possível gerar: ' + e.message) }
 }
+
+/* ---------- acompanhar processo de outra pessoa (ex.: filho que acompanha o processo da mãe) ---------- */
+const acompanhados = pid => db.processos.filter(x => (x.observadores || []).includes(pid));
+function acompanharHtml(p) {
+  const L = acompanhados(p.id);
+  return `<div class="card" style="padding:12px 16px"><b>👁 Acompanha no site</b> <span class="sub">– processos de outras pessoas que ${esc(p.nome.split(' ')[0])} pode ver na Área do cliente (ex.: filho que acompanha o processo da mãe)</span>
+  ${L.length ? `<div style="margin-top:6px">${L.map(x => `<div class="item"><div class="grow"><a href="#processo/${x.id}"><b>${esc(x.numero || '(sem número)')}</b></a> <span class="sub">${esc(nomeP(x.clienteId))}${x.acao ? ' · ' + esc(x.acao) : ''}</span></div><button onclick="desvincularAcomp('${p.id}','${x.id}')">Remover</button></div>`).join('')}</div>` : ''}
+  <div class="acts" style="margin-top:8px"><button onclick="vincularAcomp('${p.id}')">➕ Vincular processo para acompanhar</button></div></div>`;
+}
+function vincularAcomp(pid) {
+  if (bloqueado()) return;
+  const p = byId('pessoas', pid); if (!p) return;
+  showModal(`<div class="mbox"><div class="mhead"><h3>Vincular processo para ${esc(p.nome.split(' ')[0])} acompanhar</h3><button class="x" onclick="closeModal()">×</button></div>
+  <p class="sub">${esc(p.nome)} vai ver este processo na Área do cliente do site, mesmo sem ser parte. Ele continua sendo do cliente original.</p>
+  <div class="pick" style="margin-top:10px"><input class="filt" placeholder="digite o nome do cliente ou o nº do processo…" oninput="filtSel(this)"><select id="acSel" size="8" style="width:100%">${procOpts('')}</select></div>
+  <div class="mfoot"><button onclick="closeModal()">Cancelar</button><button class="pri" onclick="confirmarAcomp('${pid}')">Vincular</button></div></div>`);
+  setTimeout(() => { const i = document.querySelector('#modal .filt'); i && i.focus() }, 50);
+}
+function confirmarAcomp(pid) {
+  const v = $('#acSel').value; if (!v) { alert('Escolha um processo.'); return }
+  const x = byId('processos', v); if (!x) return;
+  if (ehCli(x, pid)) { alert('Esta pessoa já é cliente neste processo: ela já vê o processo no site.'); return }
+  x.observadores = [...new Set([...(x.observadores || []), pid])]; x._m = new Date().toISOString();
+  save(); closeModal(); render(); toast('Processo vinculado. Já aparece na Área do cliente.');
+}
+function desvincularAcomp(pid, procId) {
+  const x = byId('processos', procId); if (!x || !confirm('Remover o acesso a este processo?')) return;
+  x.observadores = (x.observadores || []).filter(o => o !== pid); x._m = new Date().toISOString(); save(); render();
+}
+(() => {
+  const base = VIEWS.pessoa;
+  VIEWS.pessoa = id => { const h = base(id), p = byId('pessoas', id); return p ? h.replace('<div class="tabs">', acompanharHtml(p) + '<div class="tabs">') : h };
+})();
 
 /* ===== Acessos dos clientes à Área do cliente (registrados pelo intermediário do site em /acessos/AAAA-MM.json) ===== */
 let ACESSOS = null, ACESSOS_T = 0;

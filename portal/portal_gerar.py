@@ -106,7 +106,7 @@ def gerar(d, saida):
             agenda_por.setdefault(z['processoId'], []).append(z)
     for p in d['processos']:
         if (p.get('portal') or 'Mostrar') != 'Ocultar' and len(dig(p.get('numero'))) >= 15:
-            for cid in dict.fromkeys([p.get('clienteId')] + list(p.get('outrosClientes') or [])):
+            for cid in dict.fromkeys([p.get('clienteId')] + list(p.get('outrosClientes') or []) + list(p.get('observadores') or [])):
                 proc_por.setdefault(cid, []).append(p)
     for velha in ('d', 'c'):
         if os.path.isdir(os.path.join(saida, velha)):

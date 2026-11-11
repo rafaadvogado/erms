@@ -126,7 +126,7 @@ async function areaCliente(fid, env, req, ctx) {
   if (!c) return null;
   const hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
   const P = Object.fromEntries((d.pessoas || []).map(p => [p.id, p]));
-  const procs = (d.processos || []).filter(p => vivo(p) && (p.clienteId === c.id || (p.outrosClientes || []).includes(c.id)) && (p.portal || 'Mostrar') !== 'Ocultar' && dig(p.numero).length >= 15)
+  const procs = (d.processos || []).filter(p => vivo(p) && (p.clienteId === c.id || (p.outrosClientes || []).includes(c.id) || (p.observadores || []).includes(c.id)) && (p.portal || 'Mostrar') !== 'Ocultar' && dig(p.numero).length >= 15)
     .sort((a, b) => ((['Ativo', 'Suspenso'].includes(a.status || 'Ativo') ? 0 : 1) - (['Ativo', 'Suspenso'].includes(b.status || 'Ativo') ? 0 : 1)) || String(a.numero).localeCompare(String(b.numero)));
   if (ctx && req) ctx.waitUntil(registrarAcesso(env, { tipo: 'entrada', pid: c.id, nome: c.nome || '', proc: procs.filter(p => ['Ativo', 'Suspenso'].includes(p.status || 'Ativo')).length, disp: dispositivo(req) }).catch(() => { }));
   const conteudo = {
