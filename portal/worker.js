@@ -8,7 +8,9 @@
    Variáveis (Settings → Variables and Secrets):
      DBX_REFRESH  (secreta) – token gerado no ERMS em Backup e ajustes → "Chave do site"
      DBX_APP_KEY  – h4lwztmql1yrikv
-     ORIGENS      – https://rafaelmsouza.adv.br  (separe por vírgula se houver mais de um) */
+     ORIGENS      – https://rafaelmsouza.adv.br  (separe por vírgula se houver mais de um)
+   Avisos no celular (opcional): KV namespace ligado como PUSH + gatilho Cron a cada 30 minutos.
+     GET  /push/chave  – chave pública VAPID      POST /push/assinar – {fid, sub, noticias}      POST /push/sair – {endpoint} */
 
 const TIPOS_AGENDA = ['Audiência', 'Perícia'];
 const FONTES_OK = ['DataJud', 'DJEN', 'Recorte', 'PJe'];
@@ -42,11 +44,21 @@ export default {
         if (c && ctx) ctx.waitUntil(registrarAcesso(env, { tipo: 'processo', pid: c.id, nome: c.nome || '', numero: decodeURIComponent(v[2]).slice(0, 30), disp: dispositivo(req) }).catch(() => { }));
         return json({ ok: true });
       }
-      return json({ ok: true, servico: 'ERMS – site' }, 200);
+      // ---- avisos (notificações no celular do cliente) ----
+      if (url.pathname.startsWith('/push/')) {
+        if (!env.PUSH) return json({ erro: 'avisos ainda não configurados' }, 503);
+        if (req.method === 'GET' && url.pathname === '/push/chave') return json({ chave: (await chavesVapid(env)).pub });
+        if (req.method === 'POST' && !origens.includes(origem)) return json({ erro: 'origem não permitida' }, 403);
+        if (req.method === 'POST' && url.pathname === '/push/assinar') return json(await assinarPush(await req.json(), env));
+        if (req.method === 'POST' && url.pathname === '/push/sair') { const b = await req.json(); if (b && b.endpoint) await env.PUSH.delete('sub:' + await sha(b.endpoint)); return json({ ok: true }) }
+      }
+      return json({ ok: true, servico: 'ERMS – site', avisos: !!env.PUSH }, 200);
     } catch (e) {
       return json({ erro: e.message || 'erro' }, e.status || 500);
     }
-  }
+  },
+  // execução programada (Settings → Triggers → Cron, a cada 30 minutos): manda os avisos
+  async scheduled(evento, env, ctx) { if (env.PUSH) ctx.waitUntil(rodarAvisos(env)) }
 };
 
 function falha(msg, status = 400) { const e = new Error(msg); e.status = status; return e }
@@ -149,4 +161,113 @@ async function areaCliente(fid, env, req, ctx) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, chave, new TextEncoder().encode(JSON.stringify(conteudo)));
   return { v: 2, iv: b64(iv), c: b64(ct) };
+}
+
+
+/* ====================== AVISOS (Web Push) ======================
+   KV "PUSH" (Settings → Bindings → KV namespace, nome da variável: PUSH):
+     meta:vapid      – par de chaves VAPID, criado automaticamente na 1ª vez (a privada nunca sai daqui)
+     meta:noticias   – data do último resumo semanal de notícias enviado
+     sub:<hash>      – {fid, sub, noticias, vistos:[ids], criado} – um por celular
+   Texto dos avisos é genérico (sigilo/LGPD): o detalhe só aparece dentro do app, após o login. */
+const b64u = u => b64(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const ub64u = s => ub(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4));
+const cat = (...a) => { const r = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let o = 0; for (const x of a) { r.set(x, o); o += x.length } return r };
+const te = s => new TextEncoder().encode(s);
+async function sha(s) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', te(s)))].map(x => x.toString(16).padStart(2, '0')).join('').slice(0, 40) }
+async function hmac(chave, dados) { const k = await crypto.subtle.importKey('raw', chave, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); return new Uint8Array(await crypto.subtle.sign('HMAC', k, dados)) }
+
+async function chavesVapid(env) {
+  let v = await env.PUSH.get('meta:vapid', 'json');
+  if (!v) {
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    v = { pub: b64u(await crypto.subtle.exportKey('raw', kp.publicKey)), jwk: await crypto.subtle.exportKey('jwk', kp.privateKey) };
+    await env.PUSH.put('meta:vapid', JSON.stringify(v));
+  }
+  return v;
+}
+
+/* envia 1 aviso (RFC 8291 aes128gcm + RFC 8292 VAPID); devolve o status HTTP do serviço de push */
+async function enviarPush(env, sub, msg) {
+  const v = await chavesVapid(env);
+  const destino = new URL(sub.endpoint);
+  const jwtCab = b64u(te(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
+  const jwtCorpo = b64u(te(JSON.stringify({ aud: destino.origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: 'mailto:rafaelmsouza@adv.oabsp.org.br' })));
+  const priv = await crypto.subtle.importKey('jwk', v.jwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const assin = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, priv, te(jwtCab + '.' + jwtCorpo)));
+  const jwt = jwtCab + '.' + jwtCorpo + '.' + b64u(assin);
+  // criptografia do conteúdo
+  const uaPub = ub64u(sub.keys.p256dh), auth = ub64u(sub.keys.auth);
+  const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPub, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const segredo = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: uaKey }, eph.privateKey, 256));
+  const prkKey = await hmac(auth, segredo);
+  const ikm = (await hmac(prkKey, cat(te('WebPush: info\0'), uaPub, asPub, new Uint8Array([1])))).slice(0, 32);
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  const prk = await hmac(sal, ikm);
+  const cek = (await hmac(prk, cat(te('Content-Encoding: aes128gcm\0'), new Uint8Array([1])))).slice(0, 16);
+  const nonce = (await hmac(prk, cat(te('Content-Encoding: nonce\0'), new Uint8Array([1])))).slice(0, 12);
+  const chaveAes = await crypto.subtle.importKey('raw', cek, 'AES-GCM', false, ['encrypt']);
+  const cifrado = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, chaveAes, cat(te(JSON.stringify(msg)), new Uint8Array([2]))));
+  const corpo = cat(sal, new Uint8Array([0, 0, 16, 0]), new Uint8Array([65]), asPub, cifrado);
+  const r = await fetch(sub.endpoint, { method: 'POST', headers: { Authorization: `vapid t=${jwt}, k=${v.pub}`, 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'normal' }, body: corpo });
+  return r.status;
+}
+
+/* o que o cliente vê no app: ids dos andamentos e compromissos dos processos dele (mesmas regras da área do cliente) */
+function idsDoCliente(d, c) {
+  const exc = d.excluidos || {}, vivo = x => x && !exc[x.id], hoje = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
+  const procs = (d.processos || []).filter(p => vivo(p) && (p.clienteId === c.id || (p.outrosClientes || []).includes(c.id) || (p.observadores || []).includes(c.id))
+    && (p.portal || 'Mostrar') !== 'Ocultar' && dig(p.numero).length >= 15 && ['Ativo', 'Suspenso'].includes(p.status || 'Ativo'));
+  const ps = new Set(procs.map(p => p.id)), ids = [];
+  (d.andamentos || []).forEach(a => { if (vivo(a) && ps.has(a.processoId) && FONTES_OK.some(f => String(a.fonte || 'DataJud').includes(f))) ids.push(a.id) });
+  (d.prazos || []).forEach(z => { if (vivo(z) && ps.has(z.processoId) && TIPOS_AGENDA.includes(z.tipo) && !z.feito && (z.data || '') >= hoje) ids.push(z.id) });
+  return ids;
+}
+
+async function assinarPush(b, env) {
+  if (!b || !/^[0-9a-f]{32}$/.test(b.fid || '') || !b.sub || !/^https:\/\//.test(b.sub.endpoint || '') || !b.sub.keys?.p256dh || !b.sub.keys?.auth) throw falha('dados inválidos');
+  const d = await lerDados(env), c = clientePorChave(d, b.fid);
+  if (!c) throw falha('acesso não encontrado', 404);
+  const reg = { fid: b.fid, sub: { endpoint: b.sub.endpoint, keys: { p256dh: b.sub.keys.p256dh, auth: b.sub.keys.auth } }, noticias: !!b.noticias, vistos: idsDoCliente(d, c), criado: new Date().toISOString() };
+  await env.PUSH.put('sub:' + await sha(reg.sub.endpoint), JSON.stringify(reg));
+  return { ok: true };
+}
+
+async function rodarAvisos(env) {
+  DADOS = null; const d = await lerDados(env);
+  const br = new Date(Date.now() - 3 * 3600e3), semana = br.toISOString().slice(0, 10);
+  // resumo semanal de notícias: segunda-feira, entre 9h e 10h (horário de Brasília)
+  let resumo = null;
+  if (br.getUTCDay() === 1 && br.getUTCHours() === 9) {
+    const meta = await env.PUSH.get('meta:noticias');
+    if (meta !== semana) {
+      try {
+        const site = (env.ORIGENS || 'https://rafaelmsouza.adv.br').split(',')[0].trim();
+        const L = await (await fetch(site + '/noticias.json', { cf: { cacheTtl: 0 } })).json();
+        const desde = new Date(br.getTime() - 7 * 864e5).toISOString().slice(0, 10);
+        const n = (L || []).filter(x => (x.data || '') > desde).length;
+        if (n) resumo = { title: 'Notícias do INSS da semana', body: `${n} ${n === 1 ? 'notícia nova' : 'notícias novas'} no site. Toque para ler.`, url: '/#noticias' };
+      } catch (e) { }
+      await env.PUSH.put('meta:noticias', semana);
+    }
+  }
+  let cursor;
+  do {
+    const lista = await env.PUSH.list({ prefix: 'sub:', cursor });
+    for (const k of lista.keys) {
+      const reg = await env.PUSH.get(k.name, 'json'); if (!reg) continue;
+      const c = clientePorChave(d, reg.fid);
+      if (!c) { await env.PUSH.delete(k.name); continue }            // acesso bloqueado ou senha trocada
+      const ids = idsDoCliente(d, c), vistos = new Set(reg.vistos || []);
+      const novos = ids.filter(i => !vistos.has(i));
+      let st = 201;
+      if (novos.length) st = await enviarPush(env, reg.sub, { title: 'Novidade no seu processo', body: 'Seu processo teve uma atualização. Toque para ver.', url: '/#consulta' }).catch(() => 0);
+      if (resumo && reg.noticias && st !== 404 && st !== 410) st = await enviarPush(env, reg.sub, resumo).catch(() => 0);
+      if (st === 404 || st === 410) { await env.PUSH.delete(k.name); continue }   // celular desinstalou ou desativou
+      if (novos.length) { reg.vistos = ids; await env.PUSH.put(k.name, JSON.stringify(reg)) }
+    }
+    cursor = lista.list_complete ? null : lista.cursor;
+  } while (cursor);
 }
