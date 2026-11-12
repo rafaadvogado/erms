@@ -126,5 +126,5 @@ def carrossel(post, saida):
 
 if __name__ == '__main__':
     post = json.load(open(sys.argv[1], encoding='utf-8'))
-    print('\n'.join(render(post, sys.argv[2]) + carrossel(post, sys.argv[2])))
-    print('AVISO: o Dr. Rafael pediu em 11/11/2026 o CARROSSEL diário do Instagram: confira e envie também carrossel-*.png (renomeie para carrossel-AAAA-MM-DD-N.png) com a legenda do carrossel.')
+    print('\n'.join(render(post, sys.argv[2])))   # carrossel desativado (função carrossel() mantida, sem uso)
+    print('AVISO: desde 12/11/2026 o Dr. Rafael NÃO quer carrossel. Entregue o VÍDEO de notícia para Reels (gerar_video.py) e o story.png.')
