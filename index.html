@@ -941,7 +941,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 12/11 09:23 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 13/11 08:36 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1240,7 +1240,7 @@ async function iaPreencher(col) {
     const x = await iaChamar(col, texto, imgs);
     const { rec, avisos } = iaMontar(col, x);
     if (INTIM && col === 'prazos' && $('#frm') && $('#frm').elements.feito && $('#frm').elements.feito.checked) rec.feito = true;
-    if (INTIM && col === 'prazos') Object.assign(INTIM, { andamento: x.andamento || '', situacao: x.situacao_cliente || '', data: x.data_publicacao || (x.data_disponibilizacao ? isoD(proxUtil(parseD(x.data_disponibilizacao), x.justica || 'federal')) : '') });
+    if (INTIM && col === 'prazos') Object.assign(INTIM, { andamento: x.andamento || '', situacao: x.situacao_cliente || '', data: x.data_disponibilizacao || x.data_publicacao || '' });
     const pre = IA_PRESET || {}; ['pessoaId', 'processoId', 'leadId'].forEach(k => { if (pre[k]) rec[k] = pre[k] });
     if (pre.pessoaId && avisos.length) for (let i = avisos.length - 1; i >= 0; i--) if (/^Não identifiquei o cliente/.test(avisos[i])) avisos.splice(i, 1);
     closeModal();
