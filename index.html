@@ -941,7 +941,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 13/11 08:36 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 16/11 11:01 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1723,6 +1723,67 @@ function trocarEmojis(raiz) {
   new MutationObserver(ms => { for (const m of ms) { if (m.type === 'characterData') fila.add(m.target); else m.addedNodes.forEach(n => fila.add(n)) } if (!ag) ag = requestAnimationFrame(processar) })
     .observe(document.body, { childList: true, subtree: true, characterData: true });
   trocarEmojis(document.body);
+})();
+
+/* ERMS – botão de COPIAR ao lado de todo número de processo (padrão CNJ) exibido no sistema.
+   Pedido do Dr. Rafael em 16/11/2026. Não altera dados: só a exibição. */
+(function () {
+  const RX = /\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b/g;
+  const PULAR = 'input,textarea,select,option,script,style,button,[contenteditable],svg,.cnj,#toast,title';
+  const ICO = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+  const OK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+  const css = document.createElement('style');
+  css.textContent = `.cnj{white-space:nowrap}
+.cnjcp{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:4px;padding:0;border:1px solid transparent;border-radius:5px;background:transparent;color:#8a94a8;cursor:pointer;vertical-align:-3px;line-height:1}
+.cnjcp:hover{background:rgba(31,58,120,.08);border-color:rgba(31,58,120,.18);color:#1f3a78}
+.cnjcp.ok{color:#2e7d4f}
+@media print{.cnjcp{display:none!important}}`;
+  document.head.appendChild(css);
+
+  function marcar(raiz) {
+    if (!raiz) return;
+    if (raiz.nodeType === 3) { tratarTexto(raiz); return }
+    if (raiz.nodeType !== 1 || raiz.closest(PULAR)) return;
+    const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => (RX.lastIndex = 0, RX.test(n.nodeValue) && !(n.parentElement && n.parentElement.closest(PULAR))) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+    });
+    const L = []; let n; while ((n = w.nextNode())) L.push(n);
+    L.forEach(tratarTexto);
+  }
+  function tratarTexto(t) {
+    const p = t.parentElement; if (!p || p.closest(PULAR)) return;
+    const s = t.nodeValue; RX.lastIndex = 0; if (!RX.test(s)) return;
+    const frag = document.createDocumentFragment(); let i = 0; RX.lastIndex = 0; let m;
+    while ((m = RX.exec(s))) {
+      if (m.index > i) frag.appendChild(document.createTextNode(s.slice(i, m.index)));
+      const sp = document.createElement('span'); sp.className = 'cnj'; sp.textContent = m[0];
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'cnjcp'; b.dataset.n = m[0];
+      b.title = 'Copiar o número do processo'; b.setAttribute('aria-label', 'Copiar ' + m[0]); b.innerHTML = ICO;
+      sp.appendChild(b); frag.appendChild(sp); i = m.index + m[0].length;
+    }
+    if (i < s.length) frag.appendChild(document.createTextNode(s.slice(i)));
+    t.replaceWith(frag);
+  }
+  async function copiar(txt) {
+    try { await navigator.clipboard.writeText(txt); return true } catch (e) { }
+    try { const a = document.createElement('textarea'); a.value = txt; a.style.position = 'fixed'; a.style.opacity = '0'; document.body.appendChild(a); a.select(); const ok = document.execCommand('copy'); a.remove(); return ok } catch (e) { return false }
+  }
+  // captura antes dos cliques da linha/link (para não abrir o processo ao copiar)
+  document.addEventListener('click', async e => {
+    const b = e.target.closest && e.target.closest('.cnjcp'); if (!b) return;
+    e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+    const ok = await copiar(b.dataset.n);
+    if (typeof toast === 'function') toast(ok ? 'Número copiado: ' + b.dataset.n : 'Não foi possível copiar');
+    if (ok) { b.classList.add('ok'); b.innerHTML = OK; setTimeout(() => { b.classList.remove('ok'); b.innerHTML = ICO }, 1500) }
+  }, true);
+  ['mousedown', 'pointerdown', 'touchstart'].forEach(ev => document.addEventListener(ev, e => { if (e.target.closest && e.target.closest('.cnjcp')) e.stopPropagation() }, true));
+
+  const fila = new Set(); let ag = 0;
+  function processar() { ag = 0; const L = [...fila]; fila.clear(); L.forEach(n => n.isConnected && marcar(n)) }
+  new MutationObserver(ms => { for (const m of ms) { if (m.type === 'characterData') fila.add(m.target); else m.addedNodes.forEach(n => { if (!(n.nodeType === 1 && (n.classList.contains('cnj') || n.classList.contains('cnjcp')))) fila.add(n) }) } if (!ag) ag = requestAnimationFrame(processar) })
+    .observe(document.body, { childList: true, subtree: true, characterData: true });
+  marcar(document.body);
 })();
 
 render();initDropbox();
