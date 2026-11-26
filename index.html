@@ -941,7 +941,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 26/11 09:46 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 26/11 12:24 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1883,6 +1883,352 @@ function lMovimentacoes() {
   if (!a.length) return '<div class="empty">Nenhuma movimentação no período.</div>';
   return `<div class="sub" style="margin-bottom:6px">${a.length} movimentação(ões)${a.length > 300 ? ' – mostrando 300' : ''}</div><div class="card">` + a.slice(0, 300).map(x => { const p = byId('processos', x.processoId); return `<div class="item"><div style="min-width:82px"><b>${fd(x.data)}</b></div><div class="grow"><a href="#processo/${p.id}"><b>${esc(nomeP(p.clienteId))}</b></a> <span class="sub">${esc(p.numero || '')}</span><div style="white-space:pre-wrap">${esc(x.descricao)}</div>${x.fonte ? `<div class="sub">${esc(x.fonte)}</div>` : ''}</div></div>` }).join('') + '</div>';
 }
+
+/* QR Code Generator for JavaScript – Copyright (c) 2009 Kazuhiko Arase – MIT license (qrcode-generator 2.0.4) */
+var qrcode=function(){var t=function(t,r){var e=t,n=g[r],o=null,i=0,a=null,u=[],f={},c=function(t,r){o=function(t){for(var r=new Array(t),e=0;e<t;e+=1){r[e]=new Array(t);for(var n=0;n<t;n+=1)r[e][n]=null}return r}(i=4*e+17),l(0,0),l(i-7,0),l(0,i-7),s(),h(),d(t,r),e>=7&&v(t),null==a&&(a=p(e,n,u)),w(a,r)},l=function(t,r){for(var e=-1;e<=7;e+=1)if(!(t+e<=-1||i<=t+e))for(var n=-1;n<=7;n+=1)r+n<=-1||i<=r+n||(o[t+e][r+n]=0<=e&&e<=6&&(0==n||6==n)||0<=n&&n<=6&&(0==e||6==e)||2<=e&&e<=4&&2<=n&&n<=4)},h=function(){for(var t=8;t<i-8;t+=1)null==o[t][6]&&(o[t][6]=t%2==0);for(var r=8;r<i-8;r+=1)null==o[6][r]&&(o[6][r]=r%2==0)},s=function(){for(var t=B.getPatternPosition(e),r=0;r<t.length;r+=1)for(var n=0;n<t.length;n+=1){var i=t[r],a=t[n];if(null==o[i][a])for(var u=-2;u<=2;u+=1)for(var f=-2;f<=2;f+=1)o[i+u][a+f]=-2==u||2==u||-2==f||2==f||0==u&&0==f}},v=function(t){for(var r=B.getBCHTypeNumber(e),n=0;n<18;n+=1){var a=!t&&1==(r>>n&1);o[Math.floor(n/3)][n%3+i-8-3]=a}for(n=0;n<18;n+=1){a=!t&&1==(r>>n&1);o[n%3+i-8-3][Math.floor(n/3)]=a}},d=function(t,r){for(var e=n<<3|r,a=B.getBCHTypeInfo(e),u=0;u<15;u+=1){var f=!t&&1==(a>>u&1);u<6?o[u][8]=f:u<8?o[u+1][8]=f:o[i-15+u][8]=f}for(u=0;u<15;u+=1){f=!t&&1==(a>>u&1);u<8?o[8][i-u-1]=f:u<9?o[8][15-u-1+1]=f:o[8][15-u-1]=f}o[i-8][8]=!t},w=function(t,r){for(var e=-1,n=i-1,a=7,u=0,f=B.getMaskFunction(r),c=i-1;c>0;c-=2)for(6==c&&(c-=1);;){for(var g=0;g<2;g+=1)if(null==o[n][c-g]){var l=!1;u<t.length&&(l=1==(t[u]>>>a&1)),f(n,c-g)&&(l=!l),o[n][c-g]=l,-1==(a-=1)&&(u+=1,a=7)}if((n+=e)<0||i<=n){n-=e,e=-e;break}}},p=function(t,r,e){for(var n=A.getRSBlocks(t,r),o=b(),i=0;i<e.length;i+=1){var a=e[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var u=0;for(i=0;i<n.length;i+=1)u+=n[i].dataCount;if(o.getLengthInBits()>8*u)throw"code length overflow. ("+o.getLengthInBits()+">"+8*u+")";for(o.getLengthInBits()+4<=8*u&&o.put(0,4);o.getLengthInBits()%8!=0;)o.putBit(!1);for(;!(o.getLengthInBits()>=8*u||(o.put(236,8),o.getLengthInBits()>=8*u));)o.put(17,8);return function(t,r){for(var e=0,n=0,o=0,i=new Array(r.length),a=new Array(r.length),u=0;u<r.length;u+=1){var f=r[u].dataCount,c=r[u].totalCount-f;n=Math.max(n,f),o=Math.max(o,c),i[u]=new Array(f);for(var g=0;g<i[u].length;g+=1)i[u][g]=255&t.getBuffer()[g+e];e+=f;var l=B.getErrorCorrectPolynomial(c),h=k(i[u],l.getLength()-1).mod(l);for(a[u]=new Array(l.getLength()-1),g=0;g<a[u].length;g+=1){var s=g+h.getLength()-a[u].length;a[u][g]=s>=0?h.getAt(s):0}}var v=0;for(g=0;g<r.length;g+=1)v+=r[g].totalCount;var d=new Array(v),w=0;for(g=0;g<n;g+=1)for(u=0;u<r.length;u+=1)g<i[u].length&&(d[w]=i[u][g],w+=1);for(g=0;g<o;g+=1)for(u=0;u<r.length;u+=1)g<a[u].length&&(d[w]=a[u][g],w+=1);return d}(o,n)};f.addData=function(t,r){var e=null;switch(r=r||"Byte"){case"Numeric":e=M(t);break;case"Alphanumeric":e=x(t);break;case"Byte":e=m(t);break;case"Kanji":e=L(t);break;default:throw"mode:"+r}u.push(e),a=null},f.isDark=function(t,r){if(t<0||i<=t||r<0||i<=r)throw t+","+r;return o[t][r]},f.getModuleCount=function(){return i},f.make=function(){if(e<1){for(var t=1;t<40;t++){for(var r=A.getRSBlocks(t,n),o=b(),i=0;i<u.length;i++){var a=u[i];o.put(a.getMode(),4),o.put(a.getLength(),B.getLengthInBits(a.getMode(),t)),a.write(o)}var g=0;for(i=0;i<r.length;i++)g+=r[i].dataCount;if(o.getLengthInBits()<=8*g)break}e=t}c(!1,function(){for(var t=0,r=0,e=0;e<8;e+=1){c(!0,e);var n=B.getLostPoint(f);(0==e||t>n)&&(t=n,r=e)}return r}())},f.createTableTag=function(t,r){t=t||2;var e="";e+='<table style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: "+(r=void 0===r?4*t:r)+"px;",e+='">',e+="<tbody>";for(var n=0;n<f.getModuleCount();n+=1){e+="<tr>";for(var o=0;o<f.getModuleCount();o+=1)e+='<td style="',e+=" border-width: 0px; border-style: none;",e+=" border-collapse: collapse;",e+=" padding: 0px; margin: 0px;",e+=" width: "+t+"px;",e+=" height: "+t+"px;",e+=" background-color: ",e+=f.isDark(n,o)?"#000000":"#ffffff",e+=";",e+='"/>';e+="</tr>"}return e+="</tbody>",e+="</table>"},f.createSvgTag=function(t,r,e,n){var o={};"object"==typeof arguments[0]&&(t=(o=arguments[0]).cellSize,r=o.margin,e=o.alt,n=o.title),t=t||2,r=void 0===r?4*t:r,(e="string"==typeof e?{text:e}:e||{}).text=e.text||null,e.id=e.text?e.id||"qrcode-description":null,(n="string"==typeof n?{text:n}:n||{}).text=n.text||null,n.id=n.text?n.id||"qrcode-title":null;var i,a,u,c,g=f.getModuleCount()*t+2*r,l="";for(c="l"+t+",0 0,"+t+" -"+t+",0 0,-"+t+"z ",l+='<svg version="1.1" xmlns="http://www.w3.org/2000/svg"',l+=o.scalable?"":' width="'+g+'px" height="'+g+'px"',l+=' viewBox="0 0 '+g+" "+g+'" ',l+=' preserveAspectRatio="xMinYMin meet"',l+=n.text||e.text?' role="img" aria-labelledby="'+y([n.id,e.id].join(" ").trim())+'"':"",l+=">",l+=n.text?'<title id="'+y(n.id)+'">'+y(n.text)+"</title>":"",l+=e.text?'<description id="'+y(e.id)+'">'+y(e.text)+"</description>":"",l+='<rect width="100%" height="100%" fill="white" cx="0" cy="0"/>',l+='<path d="',a=0;a<f.getModuleCount();a+=1)for(u=a*t+r,i=0;i<f.getModuleCount();i+=1)f.isDark(a,i)&&(l+="M"+(i*t+r)+","+u+c);return l+='" stroke="transparent" fill="black"/>',l+="</svg>"},f.createDataURL=function(t,r){t=t||2,r=void 0===r?4*t:r;var e=f.getModuleCount()*t+2*r,n=r,o=e-r;return I(e,e,function(r,e){if(n<=r&&r<o&&n<=e&&e<o){var i=Math.floor((r-n)/t),a=Math.floor((e-n)/t);return f.isDark(a,i)?0:1}return 1})},f.createImgTag=function(t,r,e){t=t||2,r=void 0===r?4*t:r;var n=f.getModuleCount()*t+2*r,o="";return o+="<img",o+=' src="',o+=f.createDataURL(t,r),o+='"',o+=' width="',o+=n,o+='"',o+=' height="',o+=n,o+='"',e&&(o+=' alt="',o+=y(e),o+='"'),o+="/>"};var y=function(t){for(var r="",e=0;e<t.length;e+=1){var n=t.charAt(e);switch(n){case"<":r+="&lt;";break;case">":r+="&gt;";break;case"&":r+="&amp;";break;case'"':r+="&quot;";break;default:r+=n}}return r};return f.createASCII=function(t,r){if((t=t||1)<2)return function(t){t=void 0===t?2:t;var r,e,n,o,i,a=1*f.getModuleCount()+2*t,u=t,c=a-t,g={"██":"█","█ ":"▀"," █":"▄","  ":" "},l={"██":"▀","█ ":"▀"," █":" ","  ":" "},h="";for(r=0;r<a;r+=2){for(n=Math.floor((r-u)/1),o=Math.floor((r+1-u)/1),e=0;e<a;e+=1)i="█",u<=e&&e<c&&u<=r&&r<c&&f.isDark(n,Math.floor((e-u)/1))&&(i=" "),u<=e&&e<c&&u<=r+1&&r+1<c&&f.isDark(o,Math.floor((e-u)/1))?i+=" ":i+="█",h+=t<1&&r+1>=c?l[i]:g[i];h+="\n"}return a%2&&t>0?h.substring(0,h.length-a-1)+Array(a+1).join("▀"):h.substring(0,h.length-1)}(r);t-=1,r=void 0===r?2*t:r;var e,n,o,i,a=f.getModuleCount()*t+2*r,u=r,c=a-r,g=Array(t+1).join("██"),l=Array(t+1).join("  "),h="",s="";for(e=0;e<a;e+=1){for(o=Math.floor((e-u)/t),s="",n=0;n<a;n+=1)i=1,u<=n&&n<c&&u<=e&&e<c&&f.isDark(o,Math.floor((n-u)/t))&&(i=0),s+=i?g:l;for(o=0;o<t;o+=1)h+=s+"\n"}return h.substring(0,h.length-1)},f.renderTo2dContext=function(t,r){r=r||2;for(var e=f.getModuleCount(),n=0;n<e;n++)for(var o=0;o<e;o++)t.fillStyle=f.isDark(n,o)?"black":"white",t.fillRect(o*r,n*r,r,r)},f};t.stringToBytes=(t.stringToBytesFuncs={default:function(t){for(var r=[],e=0;e<t.length;e+=1){var n=t.charCodeAt(e);r.push(255&n)}return r}}).default,t.createStringToBytes=function(t,r){var e=function(){for(var e=S(t),n=function(){var t=e.read();if(-1==t)throw"eof";return t},o=0,i={};;){var a=e.read();if(-1==a)break;var u=n(),f=n()<<8|n();i[String.fromCharCode(a<<8|u)]=f,o+=1}if(o!=r)throw o+" != "+r;return i}(),n="?".charCodeAt(0);return function(t){for(var r=[],o=0;o<t.length;o+=1){var i=t.charCodeAt(o);if(i<128)r.push(i);else{var a=e[t.charAt(o)];"number"==typeof a?(255&a)==a?r.push(a):(r.push(a>>>8),r.push(255&a)):r.push(n)}}return r}};var r,e,n,o,i,a=1,u=2,f=4,c=8,g={L:1,M:0,Q:3,H:2},l=0,h=1,s=2,v=3,d=4,w=5,p=6,y=7,B=(r=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],e=1335,n=7973,i=function(t){for(var r=0;0!=t;)r+=1,t>>>=1;return r},(o={}).getBCHTypeInfo=function(t){for(var r=t<<10;i(r)-i(e)>=0;)r^=e<<i(r)-i(e);return 21522^(t<<10|r)},o.getBCHTypeNumber=function(t){for(var r=t<<12;i(r)-i(n)>=0;)r^=n<<i(r)-i(n);return t<<12|r},o.getPatternPosition=function(t){return r[t-1]},o.getMaskFunction=function(t){switch(t){case l:return function(t,r){return(t+r)%2==0};case h:return function(t,r){return t%2==0};case s:return function(t,r){return r%3==0};case v:return function(t,r){return(t+r)%3==0};case d:return function(t,r){return(Math.floor(t/2)+Math.floor(r/3))%2==0};case w:return function(t,r){return t*r%2+t*r%3==0};case p:return function(t,r){return(t*r%2+t*r%3)%2==0};case y:return function(t,r){return(t*r%3+(t+r)%2)%2==0};default:throw"bad maskPattern:"+t}},o.getErrorCorrectPolynomial=function(t){for(var r=k([1],0),e=0;e<t;e+=1)r=r.multiply(k([1,C.gexp(e)],0));return r},o.getLengthInBits=function(t,r){if(1<=r&&r<10)switch(t){case a:return 10;case u:return 9;case f:case c:return 8;default:throw"mode:"+t}else if(r<27)switch(t){case a:return 12;case u:return 11;case f:return 16;case c:return 10;default:throw"mode:"+t}else{if(!(r<41))throw"type:"+r;switch(t){case a:return 14;case u:return 13;case f:return 16;case c:return 12;default:throw"mode:"+t}}},o.getLostPoint=function(t){for(var r=t.getModuleCount(),e=0,n=0;n<r;n+=1)for(var o=0;o<r;o+=1){for(var i=0,a=t.isDark(n,o),u=-1;u<=1;u+=1)if(!(n+u<0||r<=n+u))for(var f=-1;f<=1;f+=1)o+f<0||r<=o+f||0==u&&0==f||a==t.isDark(n+u,o+f)&&(i+=1);i>5&&(e+=3+i-5)}for(n=0;n<r-1;n+=1)for(o=0;o<r-1;o+=1){var c=0;t.isDark(n,o)&&(c+=1),t.isDark(n+1,o)&&(c+=1),t.isDark(n,o+1)&&(c+=1),t.isDark(n+1,o+1)&&(c+=1),0!=c&&4!=c||(e+=3)}for(n=0;n<r;n+=1)for(o=0;o<r-6;o+=1)t.isDark(n,o)&&!t.isDark(n,o+1)&&t.isDark(n,o+2)&&t.isDark(n,o+3)&&t.isDark(n,o+4)&&!t.isDark(n,o+5)&&t.isDark(n,o+6)&&(e+=40);for(o=0;o<r;o+=1)for(n=0;n<r-6;n+=1)t.isDark(n,o)&&!t.isDark(n+1,o)&&t.isDark(n+2,o)&&t.isDark(n+3,o)&&t.isDark(n+4,o)&&!t.isDark(n+5,o)&&t.isDark(n+6,o)&&(e+=40);var g=0;for(o=0;o<r;o+=1)for(n=0;n<r;n+=1)t.isDark(n,o)&&(g+=1);return e+=Math.abs(100*g/r/r-50)/5*10},o),C=function(){for(var t=new Array(256),r=new Array(256),e=0;e<8;e+=1)t[e]=1<<e;for(e=8;e<256;e+=1)t[e]=t[e-4]^t[e-5]^t[e-6]^t[e-8];for(e=0;e<255;e+=1)r[t[e]]=e;var n={glog:function(t){if(t<1)throw"glog("+t+")";return r[t]},gexp:function(r){for(;r<0;)r+=255;for(;r>=256;)r-=255;return t[r]}};return n}();function k(t,r){if(void 0===t.length)throw t.length+"/"+r;var e=function(){for(var e=0;e<t.length&&0==t[e];)e+=1;for(var n=new Array(t.length-e+r),o=0;o<t.length-e;o+=1)n[o]=t[o+e];return n}(),n={getAt:function(t){return e[t]},getLength:function(){return e.length},multiply:function(t){for(var r=new Array(n.getLength()+t.getLength()-1),e=0;e<n.getLength();e+=1)for(var o=0;o<t.getLength();o+=1)r[e+o]^=C.gexp(C.glog(n.getAt(e))+C.glog(t.getAt(o)));return k(r,0)},mod:function(t){if(n.getLength()-t.getLength()<0)return n;for(var r=C.glog(n.getAt(0))-C.glog(t.getAt(0)),e=new Array(n.getLength()),o=0;o<n.getLength();o+=1)e[o]=n.getAt(o);for(o=0;o<t.getLength();o+=1)e[o]^=C.gexp(C.glog(t.getAt(o))+r);return k(e,0).mod(t)}};return n}var A=function(){var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],r=function(t,r){var e={};return e.totalCount=t,e.dataCount=r,e},e={};return e.getRSBlocks=function(e,n){var o=function(r,e){switch(e){case g.L:return t[4*(r-1)+0];case g.M:return t[4*(r-1)+1];case g.Q:return t[4*(r-1)+2];case g.H:return t[4*(r-1)+3];default:return}}(e,n);if(void 0===o)throw"bad rs block @ typeNumber:"+e+"/errorCorrectionLevel:"+n;for(var i=o.length/3,a=[],u=0;u<i;u+=1)for(var f=o[3*u+0],c=o[3*u+1],l=o[3*u+2],h=0;h<f;h+=1)a.push(r(c,l));return a},e}(),b=function(){var t=[],r=0,e={getBuffer:function(){return t},getAt:function(r){var e=Math.floor(r/8);return 1==(t[e]>>>7-r%8&1)},put:function(t,r){for(var n=0;n<r;n+=1)e.putBit(1==(t>>>r-n-1&1))},getLengthInBits:function(){return r},putBit:function(e){var n=Math.floor(r/8);t.length<=n&&t.push(0),e&&(t[n]|=128>>>r%8),r+=1}};return e},M=function(t){var r=a,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+2<r.length;)t.put(o(r.substring(n,n+3)),10),n+=3;n<r.length&&(r.length-n==1?t.put(o(r.substring(n,n+1)),4):r.length-n==2&&t.put(o(r.substring(n,n+2)),7))}},o=function(t){for(var r=0,e=0;e<t.length;e+=1)r=10*r+i(t.charAt(e));return r},i=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);throw"illegal char :"+t};return n},x=function(t){var r=u,e=t,n={getMode:function(){return r},getLength:function(t){return e.length},write:function(t){for(var r=e,n=0;n+1<r.length;)t.put(45*o(r.charAt(n))+o(r.charAt(n+1)),11),n+=2;n<r.length&&t.put(o(r.charAt(n)),6)}},o=function(t){if("0"<=t&&t<="9")return t.charCodeAt(0)-"0".charCodeAt(0);if("A"<=t&&t<="Z")return t.charCodeAt(0)-"A".charCodeAt(0)+10;switch(t){case" ":return 36;case"$":return 37;case"%":return 38;case"*":return 39;case"+":return 40;case"-":return 41;case".":return 42;case"/":return 43;case":":return 44;default:throw"illegal char :"+t}};return n},m=function(r){var e=f,n=t.stringToBytes(r),o={getMode:function(){return e},getLength:function(t){return n.length},write:function(t){for(var r=0;r<n.length;r+=1)t.put(n[r],8)}};return o},L=function(r){var e=c,n=t.stringToBytesFuncs.SJIS;if(!n)throw"sjis not supported.";!function(){var t=n("友");if(2!=t.length||38726!=(t[0]<<8|t[1]))throw"sjis not supported."}();var o=n(r),i={getMode:function(){return e},getLength:function(t){return~~(o.length/2)},write:function(t){for(var r=o,e=0;e+1<r.length;){var n=(255&r[e])<<8|255&r[e+1];if(33088<=n&&n<=40956)n-=33088;else{if(!(57408<=n&&n<=60351))throw"illegal char at "+(e+1)+"/"+n;n-=49472}n=192*(n>>>8&255)+(255&n),t.put(n,13),e+=2}if(e<r.length)throw"illegal char at "+(e+1)}};return i},D=function(){var t=[],r={writeByte:function(r){t.push(255&r)},writeShort:function(t){r.writeByte(t),r.writeByte(t>>>8)},writeBytes:function(t,e,n){e=e||0,n=n||t.length;for(var o=0;o<n;o+=1)r.writeByte(t[o+e])},writeString:function(t){for(var e=0;e<t.length;e+=1)r.writeByte(t.charCodeAt(e))},toByteArray:function(){return t},toString:function(){var r="";r+="[";for(var e=0;e<t.length;e+=1)e>0&&(r+=","),r+=t[e];return r+="]"}};return r},S=function(t){var r=t,e=0,n=0,o=0,i={read:function(){for(;o<8;){if(e>=r.length){if(0==o)return-1;throw"unexpected end of file./"+o}var t=r.charAt(e);if(e+=1,"="==t)return o=0,-1;t.match(/^\s$/)||(n=n<<6|a(t.charCodeAt(0)),o+=6)}var i=n>>>o-8&255;return o-=8,i}},a=function(t){if(65<=t&&t<=90)return t-65;if(97<=t&&t<=122)return t-97+26;if(48<=t&&t<=57)return t-48+52;if(43==t)return 62;if(47==t)return 63;throw"c:"+t};return i},I=function(t,r,e){for(var n=function(t,r){var e=t,n=r,o=new Array(t*r),i={setPixel:function(t,r,n){o[r*e+t]=n},write:function(t){t.writeString("GIF87a"),t.writeShort(e),t.writeShort(n),t.writeByte(128),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(0),t.writeByte(255),t.writeByte(255),t.writeByte(255),t.writeString(","),t.writeShort(0),t.writeShort(0),t.writeShort(e),t.writeShort(n),t.writeByte(0);var r=a(2);t.writeByte(2);for(var o=0;r.length-o>255;)t.writeByte(255),t.writeBytes(r,o,255),o+=255;t.writeByte(r.length-o),t.writeBytes(r,o,r.length-o),t.writeByte(0),t.writeString(";")}},a=function(t){for(var r=1<<t,e=1+(1<<t),n=t+1,i=u(),a=0;a<r;a+=1)i.add(String.fromCharCode(a));i.add(String.fromCharCode(r)),i.add(String.fromCharCode(e));var f,c,g,l=D(),h=(f=l,c=0,g=0,{write:function(t,r){if(t>>>r!=0)throw"length over";for(;c+r>=8;)f.writeByte(255&(t<<c|g)),r-=8-c,t>>>=8-c,g=0,c=0;g|=t<<c,c+=r},flush:function(){c>0&&f.writeByte(g)}});h.write(r,n);var s=0,v=String.fromCharCode(o[s]);for(s+=1;s<o.length;){var d=String.fromCharCode(o[s]);s+=1,i.contains(v+d)?v+=d:(h.write(i.indexOf(v),n),i.size()<4095&&(i.size()==1<<n&&(n+=1),i.add(v+d)),v=d)}return h.write(i.indexOf(v),n),h.write(e,n),h.flush(),l.toByteArray()},u=function(){var t={},r=0,e={add:function(n){if(e.contains(n))throw"dup key:"+n;t[n]=r,r+=1},size:function(){return r},indexOf:function(r){return t[r]},contains:function(r){return void 0!==t[r]}};return e};return i}(t,r),o=0;o<r;o+=1)for(var i=0;i<t;i+=1)n.setPixel(i,o,e(i,o));var a=D();n.write(a);for(var u=function(){var t=0,r=0,e=0,n="",o={},i=function(t){n+=String.fromCharCode(a(63&t))},a=function(t){if(t<0);else{if(t<26)return 65+t;if(t<52)return t-26+97;if(t<62)return t-52+48;if(62==t)return 43;if(63==t)return 47}throw"n:"+t};return o.writeByte=function(n){for(t=t<<8|255&n,r+=8,e+=1;r>=6;)i(t>>>r-6),r-=6},o.flush=function(){if(r>0&&(i(t<<6-r),t=0,r=0),e%3!=0)for(var o=3-e%3,a=0;a<o;a+=1)n+="="},o.toString=function(){return n},o}(),f=a.toByteArray(),c=0;c<f.length;c+=1)u.writeByte(f[c]);return u.flush(),"data:image/gif;base64,"+u};return t}();qrcode.stringToBytesFuncs["UTF-8"]=function(t){return function(t){for(var r=[],e=0;e<t.length;e++){var n=t.charCodeAt(e);n<128?r.push(n):n<2048?r.push(192|n>>6,128|63&n):n<55296||n>=57344?r.push(224|n>>12,128|n>>6&63,128|63&n):(e++,n=65536+((1023&n)<<10|1023&t.charCodeAt(e)),r.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|63&n))}return r}(t)},function(t){"function"==typeof define&&define.amd?define([],t):"object"==typeof exports&&(module.exports=t())}(function(){return qrcode});
+/* ================= ERMS – ACESSO RESTRITO (equipe pelo site) =================
+   Quem não tem o Dropbox do escritório entra com CPF + senha + código do app autenticador.
+   Os dados vêm do intermediário (Cloudflare Worker), já filtrados pelas permissões do usuário,
+   e as alterações voltam por ele. A senha nunca sai do aparelho: daqui sai só uma chave derivada (PBKDF2).
+   No aparelho do Dr. Rafael (conectado ao Dropbox) aparece a tela "Usuários e acessos". */
+const EQ_URL = 'https://erms-site.p68zfdv7j2.workers.dev/acesso/';
+const EQ_SES = 'erms_sessao', EQ_BASE = 'erms_eq_base', EQ_UID = 'erms_eq_uid';
+let SESSAO = (() => { try { const s = JSON.parse(localStorage.getItem(EQ_SES)); return s && s.token ? s : null } catch (e) { return null } })();
+const EQUIPE = !dbx && !!SESSAO;
+let EQ_MSG = '';
+const EQ_VIEWS = ['painel', 'conversas', 'processos', 'processo', 'pessoas', 'pessoa', 'prazos', 'movimentacoes', 'relatorios', 'busca', 'conta', 'leads', 'lead', 'honorarios'];
+
+/* ---------- utilidades ---------- */
+const eqDig = s => String(s || '').replace(/\D/g, '');
+const eqCpfOk = c => { c = eqDig(c); if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false; const dv = n => { let s = 0; for (let i = 0; i < n; i++) s += +c[i] * (n + 1 - i); const r = s * 10 % 11; return r === 10 ? 0 : r }; return dv(9) === +c[9] && dv(10) === +c[10] };
+const eqCpfF = c => { c = eqDig(c); return c.length === 11 ? `${c.slice(0, 3)}.${c.slice(3, 6)}.${c.slice(6, 9)}-${c.slice(9)}` : c };
+const eqCpfMasc = c => { c = eqDig(c); return c.length === 11 ? `***.${c.slice(3, 6)}.${c.slice(6, 9)}-**` : '' };
+function eqHash(s) { let h1 = 0xdeadbeef, h2 = 0x41c6ce57; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677) } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return (h2 >>> 0).toString(36) + (h1 >>> 0).toString(36) }
+const eqHashR = r => eqHash(semM(r));
+async function eqDerivar(senha, sal) {
+  const s = Uint8Array.from(atob(sal.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((sal.length + 3) % 4)), c => c.charCodeAt(0));
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, ['deriveBits']);
+  return b64url(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: s, iterations: 210000 }, k, 256));
+}
+async function apiEq(rota, corpo) {
+  const h = {}; if (corpo) h['content-type'] = 'application/json'; if (SESSAO) h.Authorization = 'Bearer ' + SESSAO.token;
+  const r = await fetch(EQ_URL + rota, { method: corpo ? 'POST' : 'GET', headers: h, body: corpo ? JSON.stringify(corpo) : undefined });
+  const j = await r.json().catch(() => ({ erro: 'resposta inválida do servidor' }));
+  if (!r.ok) { const e = new Error(j.erro || ('HTTP ' + r.status)); e.status = r.status; throw e }
+  return j;
+}
+
+/* ---------- telas de entrada ---------- */
+const eqCaixa = (titulo, corpo) => `<div style="max-width:440px;margin:40px auto"><div style="text-align:center"><img src="${LOGO}" style="width:96px;border-radius:10px"><h1 style="margin:12px 0 2px">ERMS</h1><p class="sub">Acesso restrito – equipe do escritório</p></div>
+<div class="card"><h2>${titulo}</h2>${EQ_MSG ? `<div class="banner" style="margin-bottom:10px">${esc(EQ_MSG)}</div>` : ''}${corpo}</div>
+<p class="sub" style="text-align:center">Uso exclusivo de pessoas autorizadas pelo Dr. Rafael de Mello Souza. Os acessos são registrados.</p></div>`;
+const eqCampo = (id, rot, extra = '') => `<label style="display:block;margin:10px 0 4px"><b>${rot}</b></label><input id="${id}" style="width:100%;font-size:17px;padding:10px;box-sizing:border-box" ${extra}>`;
+function telaEntrarEq() {
+  if (dbx) return eqCaixa('Este aparelho é do escritório', `<p>Este aparelho já está conectado ao Dropbox do escritório, com acesso completo. O acesso restrito é para os aparelhos da equipe.</p><a class="btn" href="#painel">Voltar ao painel</a>`);
+  return eqCaixa('Entrar', `<form onsubmit="event.preventDefault();entrarEq()">
+  ${eqCampo('eqCpf', 'CPF', 'inputmode="numeric" autocomplete="username" placeholder="000.000.000-00"')}
+  ${eqCampo('eqSenha', 'Senha', 'type="password" autocomplete="current-password"')}
+  ${eqCampo('eqCod', 'Código do app autenticador', 'inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 números" style="width:100%;font-size:22px;letter-spacing:6px;padding:10px;box-sizing:border-box"')}
+  <button class="big pri" id="eqBt" style="width:100%;margin-top:14px;padding:12px">Entrar</button></form>
+  <p class="sub" style="margin-top:14px">Primeira vez? <a href="#ativar">Tenho um código de convite</a></p>`);
+}
+function telaAtivarEq() {
+  if (dbx) return telaEntrarEq();
+  return eqCaixa('Primeiro acesso', `<div id="eqAt"><p>Use o <b>código de convite</b> que o Dr. Rafael enviou. Antes, instale no celular um app autenticador gratuito: <b>Google Authenticator</b> ou <b>Microsoft Authenticator</b>.</p>
+  <form onsubmit="event.preventDefault();ativarEq1()">${eqCampo('eqCpf', 'CPF', 'inputmode="numeric" placeholder="000.000.000-00"')}${eqCampo('eqConv', 'Código de convite', 'autocapitalize="characters" autocomplete="off" placeholder="XXXX-XXXX-XXXX"')}
+  <button class="big pri" id="eqBt" style="width:100%;margin-top:14px;padding:12px">Continuar</button></form>
+  <p class="sub" style="margin-top:14px"><a href="#entrar">Já tenho senha – entrar</a></p></div>`);
+}
+const eqOcupado = (sim, txt) => { const b = $('#eqBt'); if (b) { b.disabled = sim; if (txt) b.textContent = txt } };
+function eqErro(e) { EQ_MSG = e.message || String(e); render() }
+async function entrarEq() {
+  const cpf = eqDig($('#eqCpf').value), senha = $('#eqSenha').value, cod = eqDig($('#eqCod').value);
+  if (!eqCpfOk(cpf)) return alert('Confira o CPF.');
+  if (!senha || cod.length !== 6) return alert('Preencha a senha e o código de 6 números do app autenticador.');
+  eqOcupado(true, 'Conferindo…');
+  try {
+    const { sal } = await apiEq('sal', { cpf });
+    const chave = await eqDerivar(senha, sal);
+    const r = await apiEq('entrar', { cpf, chave, codigo: cod });
+    await iniciarSessaoEq(r);
+  } catch (e) { eqErro(e) }
+}
+let EQ_AT = null;
+async function ativarEq1() {
+  const cpf = eqDig($('#eqCpf').value), convite = $('#eqConv').value.trim();
+  if (!eqCpfOk(cpf)) return alert('Confira o CPF.');
+  if (convite.replace(/[^A-Za-z0-9]/g, '').length < 8) return alert('Confira o código de convite.');
+  eqOcupado(true, 'Conferindo…');
+  try {
+    const r = await apiEq('ativar1', { cpf, convite });
+    EQ_AT = { cpf, convite, ...r }; EQ_MSG = '';
+    let qr = ''; try { const q = qrcode(0, 'M'); q.addData(r.otpauth); q.make(); qr = q.createSvgTag({ cellSize: 5, margin: 2, scalable: true }) } catch (e) { }
+    $('#eqAt').innerHTML = `<p>Olá, <b>${esc(r.nome.split(' ')[0])}</b>. Falta pouco:</p>
+    <p><b>1.</b> No app autenticador, toque em <b>+</b> e <b>leia o QR code</b> abaixo${/Mobi|Android|iPhone/i.test(navigator.userAgent) ? ' (ou toque no botão, se estiver neste celular)' : ''}:</p>
+    ${qr ? `<div style="max-width:220px;margin:8px auto;background:#fff;padding:6px;border-radius:8px">${qr}</div>` : ''}
+    <a class="btn" style="display:block;text-align:center" href="${esc(r.otpauth)}">Abrir no app autenticador</a>
+    <p class="sub">Sem QR? Digite a chave no app: <code style="user-select:all;word-break:break-all">${r.segredo.match(/.{1,4}/g).join(' ')}</code></p>
+    <form onsubmit="event.preventDefault();ativarEq2()">
+    <p style="margin-top:14px"><b>2.</b> Crie sua senha (mínimo 10 caracteres; não use a mesma de outros sites):</p>
+    ${eqCampo('eqSenha', 'Senha', 'type="password" autocomplete="new-password" minlength="10"')}${eqCampo('eqSenha2', 'Repita a senha', 'type="password" autocomplete="new-password"')}
+    <p style="margin-top:14px"><b>3.</b> Digite o código de 6 números que aparece agora no app:</p>
+    ${eqCampo('eqCod', 'Código do app autenticador', 'inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="width:100%;font-size:22px;letter-spacing:6px;padding:10px;box-sizing:border-box"')}
+    <button class="big pri" id="eqBt" style="width:100%;margin-top:14px;padding:12px">Concluir e entrar</button></form>`;
+  } catch (e) { eqErro(e) }
+}
+async function ativarEq2() {
+  const s1 = $('#eqSenha').value, s2 = $('#eqSenha2').value, cod = eqDig($('#eqCod').value);
+  if (s1.length < 10) return alert('A senha precisa ter pelo menos 10 caracteres.');
+  if (s1 !== s2) return alert('As duas senhas não são iguais.');
+  if (cod.length !== 6) return alert('Digite o código de 6 números do app autenticador.');
+  eqOcupado(true, 'Gravando…');
+  try {
+    const chave = await eqDerivar(s1, EQ_AT.sal);
+    const r = await apiEq('ativar2', { cpf: EQ_AT.cpf, convite: EQ_AT.convite, chave, codigo: cod });
+    EQ_AT = null; await iniciarSessaoEq(r);
+  } catch (e) { eqOcupado(false, 'Concluir e entrar'); alert(e.message) }
+}
+async function iniciarSessaoEq(r) {
+  const antigo = localStorage.getItem(EQ_UID);
+  if (antigo !== r.usuario.id) {           // outro usuário (ou primeira vez neste aparelho): começa do zero
+    localStorage.removeItem(KEY); localStorage.removeItem(EQ_BASE);
+  }
+  localStorage.setItem(EQ_UID, r.usuario.id);
+  localStorage.setItem(EQ_SES, JSON.stringify({ token: r.token, usuario: r.usuario, em: Date.now() }));
+  EQ_MSG = '';
+  location.replace(location.pathname + '#painel'); location.reload();
+}
+function sairEq(semPerguntar) {
+  if (!semPerguntar && !confirm('Sair do ERMS neste aparelho? Os dados baixados serão apagados daqui (continuam guardados no escritório).')) return;
+  [EQ_SES, EQ_BASE, EQ_UID, KEY].forEach(k => localStorage.removeItem(k));
+  location.replace(location.pathname + '#entrar'); location.reload();
+}
+
+/* ---------- sincronização da equipe ---------- */
+let EQ_B = (() => { try { return JSON.parse(localStorage.getItem(EQ_BASE)) || null } catch (e) { return null } })();
+function eqDiferencas() {
+  const mud = {}, env = {}, vistos = new Set(), exc = {}, agora = new Date().toISOString();
+  if (!EQ_B) return { mud, env, exc, n: 0 };
+  COLS.forEach(c => db[c].forEach(r => { const k = c + ':' + r.id, h = eqHashR(r); vistos.add(k); if (EQ_B[k] !== h) { (mud[c] = mud[c] || []).push(r); env[k] = h } }));
+  Object.keys(EQ_B).forEach(k => { if (!vistos.has(k)) exc[k.slice(k.indexOf(':') + 1)] = agora });
+  return { mud, env, exc, n: Object.keys(env).length + Object.keys(exc).length };
+}
+async function sincronizarEq(forcarRender) {
+  if (!SESSAO) return;
+  if (syncRodando) { syncDeNovo = true; return }
+  syncRodando = true; syncState.status = 'sincronizando'; mostrarSync();
+  try {
+    const D = eqDiferencas();
+    const r = D.n ? await apiEq('salvar', { mudados: D.mud, excluidos: D.exc }) : await apiEq('dados');
+    if (r.recusados) toast(r.recusados + ' alteração(ões) não permitida(s) para o seu acesso foram desfeitas.');
+    const novo = fixDb(r.db), base = {};
+    COLS.forEach(c => novo[c].forEach(x => base[c + ':' + x.id] = eqHashR(x)));
+    // o que foi editado aqui enquanto o envio estava a caminho continua pendente
+    COLS.forEach(c => db[c].forEach(x => {
+      const k = c + ':' + x.id, h = eqHashR(x), enviado = D.env[k] || (EQ_B || {})[k];
+      if (EQ_B && h !== enviado) { const i = novo[c].findIndex(y => y.id === x.id); if (i < 0) novo[c].push(x); else novo[c][i] = x; base[k] = enviado || 'pendente' }
+    }));
+    if (r.usuario) { SESSAO.usuario = r.usuario; localStorage.setItem(EQ_SES, JSON.stringify(SESSAO)) }
+    const mudouLocal = JSON.stringify(db) !== JSON.stringify(novo);
+    db = novo; EQ_B = base;
+    try { localStorage.setItem(KEY, JSON.stringify(db)); localStorage.setItem(EQ_BASE, JSON.stringify(EQ_B)) } catch (e) { }
+    syncState = { status: 'ok', ultima: new Date(), erro: '' };
+    if (mudouLocal || forcarRender) { const ativo = document.activeElement; if (!$('#modal').classList.contains('on') && !(ativo && /INPUT|TEXTAREA|SELECT/.test(ativo.tagName))) render() }
+  } catch (e) {
+    if (e.status === 401) { SESSAO = null; localStorage.removeItem(EQ_SES); EQ_MSG = e.message + ' (suas alterações ficaram guardadas neste aparelho e serão enviadas depois que entrar).'; syncRodando = false; location.hash = 'entrar'; render(); return }
+    syncState.status = (navigator.onLine === false || e instanceof TypeError) ? 'offline' : 'erro'; syncState.erro = e.message;
+  } finally {
+    syncRodando = false; mostrarSync();
+    if (syncDeNovo) { syncDeNovo = false; agendarSync(300) }
+  }
+}
+
+/* ---------- liga o modo equipe ---------- */
+if (EQUIPE) {
+  const u = SESSAO.usuario || {};
+  const pode = k => !((k === 'honorarios' && !u.honorarios) || ((k === 'leads' || k === 'lead') && !u.leads));
+  for (let i = NAV.length - 1; i >= 0; i--) if (!EQ_VIEWS.includes(NAV[i][0]) || !pode(NAV[i][0])) NAV.splice(i, 1);
+  NAV.push(['conta', '👤', 'Minha conta']);
+  sincronizar = sincronizarEq;
+  agendarSync = function (ms = 1500) { if (!SESSAO) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => sincronizar(), ms) };
+  initDropbox = async function () {
+    if (!EQ_B) { EQ_B = null }                       // primeira carga: baixa tudo
+    sincronizar(true);
+    setInterval(() => { if (document.visibilityState === 'visible') sincronizar() }, 60000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sincronizar() });
+    window.addEventListener('online', () => sincronizar());
+  };
+  mostrarSync = function () {
+    const e = $('#fstat'); if (!e) return; const s = syncState;
+    e.innerHTML = `👤 ${esc((u.nome || '').split(' ')[0])} · ` + (s.status === 'sincronizando' ? '⏳ sincronizando…' : s.status === 'ok' ? `sincronizado ${s.ultima.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : s.status === 'offline' ? '📴 sem internet – salvo no aparelho' : s.status === 'erro' ? `<a href="javascript:sincronizar(true)" title="${esc(s.erro)}">⚠️ falha – tentar de novo</a>` : 'conectando…');
+  };
+  backupBanner = function () {
+    if (syncState.status === 'erro') return `<div class="banner">⚠️ A última sincronização falhou (${esc(syncState.erro)}). As alterações estão guardadas neste aparelho e serão enviadas na próxima tentativa. <button onclick="sincronizar(true)">Tentar agora</button></div>`;
+    return '';
+  };
+  saud = function () { const h = new Date().getHours(); return (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite') + ', ' + String(u.nome || '').split(' ')[0] };
+  const _painel = VIEWS.painel;
+  VIEWS.painel = function () {
+    let h = _painel.apply(this, arguments);
+    if (!u.leads) h = h.replace(/<div class="stat" onclick="go\('leads'\)">.*?<\/div>/, '').replace(/<button onclick="novo\('leads'\)">[^<]*<\/button>/g, '');
+    if (!u.honorarios) h = h.replace(/<div class="stat ok" onclick="go\('honorarios'\)">.*?<\/div>/, '').replace(/<div class="stat [^"]*" onclick="st\.hs='atr';go\('honorarios'\)">.*?<\/div>/, '');
+    return h;
+  };
+  VIEWS.conta = () => `<div class="top"><div><h1>Minha conta</h1><div class="sub">Acesso restrito ao ERMS</div></div></div>
+  <div class="card"><h2>${esc(u.nome || '')}</h2><p>Acesso: <b>${u.perfil === 'total' ? 'todos os processos' : 'processos sob sua responsabilidade e os liberados pelo Dr. Rafael'}</b>${u.honorarios ? ' · honorários' : ''}${u.leads ? ' · leads' : ''}.</p>
+  <p class="sub">Situação: ${$('#fstat') ? $('#fstat').textContent : ''}. Cada alteração é registrada com o seu nome.</p>
+  <div class="acts"><button class="pri" onclick="sincronizar(true)">🔄 Sincronizar agora</button><button class="danger" onclick="sairEq()">Sair deste aparelho</button></div>
+  <p class="sub" style="margin-top:12px">Esqueceu a senha ou trocou de celular? Peça ao Dr. Rafael um novo código de convite.</p></div>`;
+}
+
+/* ---------- roteamento: telas de entrada e bloqueio de telas não liberadas ---------- */
+{
+  const _r = render;
+  render = function () {
+    const v = (location.hash.slice(1) || 'painel').split('/')[0];
+    const eraEquipe = !dbx && !SESSAO && localStorage.getItem(EQ_UID);
+    if (!dbx && !SESSAO && (v === 'entrar' || v === 'ativar' || eraEquipe)) {
+      document.body.classList.add('eqfora'); $('#main').innerHTML = v === 'ativar' ? telaAtivarEq() : telaEntrarEq(); return;
+    }
+    if (dbx && (v === 'entrar' || v === 'ativar')) { location.hash = 'painel'; return }
+    document.body.classList.remove('eqfora');
+    if (EQUIPE && SESSAO && !NAV.some(n => n[0] === v) && !EQ_VIEWS.includes(v)) { location.hash = 'painel'; return }
+    _r();
+  };
+  const st0 = document.createElement('style');
+  st0.textContent = 'body.eqfora #nav,body.eqfora #tabbar,body.eqfora header,body.eqfora #banner,body.eqfora #fab{display:none!important}body.eqfora main,body.eqfora #main{margin-left:0!important}';
+  document.head.appendChild(st0);
+  const _te = telaEntrada;
+  telaEntrada = function () { return _te().replace(/<\/div><\/div>$/, `<p class="sub" style="margin-top:14px;text-align:center">Equipe do escritório: <a href="#entrar">entrar com CPF e senha</a></p></div></div>`) };
+}
+
+/* ================= USUÁRIOS E ACESSOS (só no aparelho do escritório, conectado ao Dropbox) ================= */
+const USU_ARQ = '/acesso/usuarios.json';
+let USU_ST = { lista: null, rev: null, erro: '', aba: 'usuarios', reg: null };
+async function usuLer() {
+  const f = await dbxBaixar(USU_ARQ);
+  const j = f ? JSON.parse(f.texto) : { usuarios: [] };
+  USU_ST.lista = Array.isArray(j.usuarios) ? j.usuarios : []; USU_ST.rev = f ? f.rev : null;
+}
+/* altera a lista com segurança: relê se o intermediário gravou no meio (ex.: alguém concluiu o primeiro acesso) */
+async function usuAlterar(fn) {
+  for (let i = 0; i < 4; i++) {
+    await usuLer();
+    const r = fn(USU_ST.lista);
+    try { const m = await dbxEnviar(USU_ARQ, JSON.stringify({ usuarios: USU_ST.lista }, null, 1), USU_ST.rev); USU_ST.rev = m.rev; return r }
+    catch (e) { if (e.code !== 409) throw e }
+  }
+  throw new Error('não foi possível gravar agora; tente de novo');
+}
+const usuNovoConvite = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint8Array(12)); return [...r].map(x => A[x % 32]).join('').replace(/(.{4})(?=.)/g, '$1-') };
+async function usuHash(c) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(c.toUpperCase().replace(/[^A-Z0-9]/g, ''))))].map(x => x.toString(16).padStart(2, '0')).join('') }
+const usuSituacao = u => u.ativo === false ? '<span class="tag" style="background:#fde2e2;color:#8a1c1c">bloqueado</span>'
+  : u.convite ? `<span class="tag" style="background:#fff3cd;color:#7a5a00">convite pendente até ${fd(String(u.convite.exp || '').slice(0, 10))}</span>`
+  : u.chaveHash ? `<span class="tag" style="background:#dff3e4;color:#1d6b35">ativo desde ${fd(String(u.ativadoEm || '').slice(0, 10))}</span>` : '<span class="tag">sem acesso</span>';
+
+VIEWS.usuarios = () => {
+  if (!dbx) return `<div class="card empty">Esta tela só funciona no aparelho conectado ao Dropbox do escritório.</div>`;
+  setTimeout(() => usuPreencher(false), 0);
+  return `<div class="top"><div><h1>Usuários e acessos</h1><div class="sub">Quem da equipe entra no ERMS pelo site (CPF + senha + app autenticador) e o que cada um pode ver</div></div>
+  <div class="acts"><button class="pri" onclick="usuEditar()">＋ Novo usuário</button></div></div>
+  <div class="filters"><button class="${USU_ST.aba === 'usuarios' ? 'pri' : ''}" onclick="USU_ST.aba='usuarios';render()">Usuários</button><button class="${USU_ST.aba === 'registros' ? 'pri' : ''}" onclick="USU_ST.aba='registros';render()">Registro de uso</button></div>
+  <div id="usuL"><div class="card empty">Carregando…</div></div>
+  <div class="card"><p class="sub">Endereço para a equipe: <b>rafaelmsouza.adv.br</b> → <b>Acesso restrito</b>. A pessoa precisa de um app autenticador no celular (Google Authenticator ou Microsoft Authenticator). Para trocar de celular ou se esquecer a senha, gere um <b>novo convite</b>: o acesso antigo deixa de funcionar na hora.</p></div>`;
+};
+async function usuPreencher(forcar) {
+  const el = $('#usuL'); if (!el) return;
+  try {
+    if (USU_ST.aba === 'registros') { await usuRegistros(el, forcar); return }
+    if (!USU_ST.lista || forcar) await usuLer();
+  } catch (e) { el.innerHTML = `<div class="card empty">Não foi possível ler: ${esc(e.message)}</div>`; return }
+  const L = USU_ST.lista;
+  el.innerHTML = !L.length ? `<div class="card empty">Nenhum usuário ainda. Toque em <b>＋ Novo usuário</b>.</div>` : L.map(u => {
+    const np = (u.processos || []).length;
+    return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(u.nome)}</b> <span class="sub">CPF ${eqCpfMasc(u.cpf)}</span><br>${usuSituacao(u)}
+    <div class="sub" style="margin-top:4px">${u.perfil === 'total' ? 'Vê <b>todos os processos</b>' : `Vê processos de <b>${esc(u.responsavel || '—')}</b>${np ? ` + ${np} liberado(s)` : ''}`}${u.honorarios ? ' · honorários' : ''}${u.leads ? ' · leads' : ''}</div></div>
+    <div class="acts"><button onclick="usuEditar('${u.id}')">Editar</button><button onclick="usuConvite('${u.id}')">${u.chaveHash ? 'Novo convite' : 'Gerar convite'}</button><button onclick="usuBloquear('${u.id}')">${u.ativo === false ? 'Desbloquear' : 'Bloquear'}</button><button class="danger" onclick="usuExcluir('${u.id}')">Excluir</button></div></div></div>`;
+  }).join('');
+}
+function usuEditar(id) {
+  const u = id ? USU_ST.lista.find(x => x.id === id) : { perfil: 'restrito', processos: [], ativo: true };
+  if (!u) return;
+  const resps = [...new Set(db.processos.map(p => p.responsavel).filter(Boolean))].sort();
+  const sel = new Set(u.processos || []);
+  showModal(`<div class="mbox"><div class="mhead"><h3>🔐 ${id ? 'Editar usuário' : 'Novo usuário'}</h3><button class="x" onclick="closeModal()">×</button></div><div class="grid">
+  <label class="fld">Nome completo<input id="uNome" value="${esc(u.nome || '')}"></label>
+  <label class="fld">CPF<input id="uCpf" inputmode="numeric" value="${esc(eqCpfF(u.cpf || ''))}" ${id && u.chaveHash ? 'disabled title="Para trocar o CPF, exclua e crie de novo"' : ''}></label>
+  <label class="fld w2">O que pode ver<select id="uPerfil" onchange="$('#uRestr').style.display=this.value==='total'?'none':''">${opt('restrito', u.perfil, 'Só os processos dele(a) e os que eu liberar')}${opt('total', u.perfil, 'Todos os processos (acesso completo)')}</select></label>
+  <div id="uRestr" class="fld w2" style="${u.perfil === 'total' ? 'display:none' : ''}">
+  <label class="fld">Processos em que é o advogado responsável<select id="uResp"><option value="">— nenhum —</option>${resps.map(r => opt(r, u.responsavel)).join('')}</select></label>
+  <label class="fld" style="margin-top:8px">Liberar também estes processos (${sel.size} marcado(s))<input id="uBusca" placeholder="buscar nº do processo ou cliente…" oninput="usuFiltrarProc()"></label>
+  <div id="uProcs" style="max-height:200px;overflow:auto;border:1px solid #ddd;border-radius:8px;padding:6px">${usuListaProc(sel, '')}</div></div>
+  <label class="fld chk w2"><input type="checkbox" id="uHon" ${u.honorarios ? 'checked' : ''}> Ver honorários (dos processos que pode ver)</label>
+  <label class="fld chk w2"><input type="checkbox" id="uLeads" ${u.leads ? 'checked' : ''}> Ver leads (contatos de possíveis clientes)</label>
+  <div class="mfoot"><button onclick="closeModal()">Cancelar</button><button class="pri" onclick="usuSalvar('${id || ''}')">Salvar</button></div></div></div>`);
+  usuEditar.sel = sel;
+}
+function usuListaProc(sel, q) {
+  q = norm(q || '');
+  const L = db.processos.filter(p => procAtivo(p) || sel.has(p.id)).filter(p => !q || norm((p.numero || '') + ' ' + nomeP(p.clienteId)).includes(q) || eqDig(p.numero).includes(eqDig(q)) && eqDig(q).length > 3)
+    .sort((a, b) => (sel.has(b.id) - sel.has(a.id)) || nomeP(a.clienteId).localeCompare(nomeP(b.clienteId))).slice(0, 80);
+  return L.map(p => `<label style="display:flex;gap:8px;align-items:center;font-weight:normal;margin:2px 0"><input type="checkbox" style="width:auto" ${sel.has(p.id) ? 'checked' : ''} onchange="usuEditar.sel[this.checked?'add':'delete']('${p.id}')"> <span>${esc(nomeP(p.clienteId))} <span class="sub">${esc(p.numero || '')}${p.responsavel ? ' · ' + esc(p.responsavel) : ''}</span></span></label>`).join('') || '<div class="sub">nada encontrado</div>';
+}
+function usuFiltrarProc() { $('#uProcs').innerHTML = usuListaProc(usuEditar.sel, $('#uBusca').value) }
+async function usuSalvar(id) {
+  const nome = $('#uNome').value.trim(), cpf = eqDig($('#uCpf').value);
+  if (nome.split(/\s+/).length < 2) return alert('Informe o nome completo.');
+  if (!eqCpfOk(cpf)) return alert('CPF inválido.');
+  const dados = { nome, perfil: $('#uPerfil').value, responsavel: $('#uResp').value, processos: [...usuEditar.sel], honorarios: $('#uHon').checked, leads: $('#uLeads').checked };
+  if (dados.perfil === 'total' && !confirm(`${nome} vai ver TODOS os processos e clientes do escritório. Confirma?`)) return;
+  if (dados.perfil === 'restrito' && !dados.responsavel && !dados.processos.length && !confirm('Este usuário não vai ver nenhum processo (sem responsável e sem processos liberados). Salvar assim mesmo?')) return;
+  try {
+    let novoId = null;
+    await usuAlterar(L => {
+      if (L.some(x => eqDig(x.cpf) === cpf && x.id !== id)) throw new Error('Já existe um usuário com este CPF.');
+      if (id) { const u = L.find(x => x.id === id); if (!u) throw new Error('usuário não encontrado'); Object.assign(u, dados); if (!u.chaveHash) u.cpf = cpf; u.alterado = new Date().toISOString() }
+      else { novoId = 'us' + Date.now().toString(36); L.push({ id: novoId, cpf, ativo: true, ver: 0, criado: new Date().toISOString(), ...dados }) }
+    });
+    closeModal(); toast('Usuário salvo.'); usuPreencher(false);
+    if (novoId && confirm('Gerar agora o código de convite para o primeiro acesso?')) usuConvite(novoId);
+  } catch (e) { alert(e.message) }
+}
+async function usuConvite(id) {
+  const u0 = USU_ST.lista.find(x => x.id === id); if (!u0) return;
+  if (u0.chaveHash && !confirm(`Gerar novo convite para ${u0.nome}? A senha e o autenticador atuais deixam de funcionar na hora (ele(a) terá que fazer o primeiro acesso de novo).`)) return;
+  const cod = usuNovoConvite(), hash = await usuHash(cod), exp = addDays(todayStr(), 7);
+  try {
+    await usuAlterar(L => { const u = L.find(x => x.id === id); if (!u) throw new Error('usuário não encontrado'); u.convite = { hash, exp, em: new Date().toISOString() }; u.chaveHash = null; u.totp = null; u.sal = null; u.ver = (u.ver || 0) + 1 });
+  } catch (e) { return alert(e.message) }
+  usuPreencher(false);
+  const msg = `Olá, ${u0.nome.split(' ')[0]}! Seu acesso ao ERMS do escritório:\n\n1) Instale no celular o app *Google Authenticator* ou *Microsoft Authenticator*.\n2) Abra rafaelmsouza.adv.br e toque em *Acesso restrito* → *Tenho um código de convite*.\n3) Informe seu CPF e o código: *${cod}*\n4) Leia o QR code com o app, crie sua senha e digite o código do app.\n\nO convite vale até ${fd(exp)}. Não compartilhe este código.`;
+  showModal(`<div class="mbox"><div class="mhead"><h3>✉️ Convite de ${esc(u0.nome)}</h3><button class="x" onclick="closeModal()">×</button></div><p>Código (vale 7 dias, uma vez só):</p><div style="font-size:26px;font-weight:700;letter-spacing:3px;text-align:center;padding:10px;background:#f5efe2;border-radius:8px;user-select:all">${cod}</div>
+  <p class="sub">Este código não fica guardado em lugar nenhum: copie agora. Mensagem pronta para enviar à pessoa (de preferência pessoalmente ou por WhatsApp):</p>
+  <textarea id="uMsg" rows="9" style="width:100%">${esc(msg)}</textarea>
+  <div class="mfoot"><button onclick="closeModal()">Fechar</button><button class="pri" onclick="navigator.clipboard.writeText($('#uMsg').value).then(()=>toast('Mensagem copiada.'))">Copiar mensagem</button></div></div>`);
+}
+async function usuBloquear(id) {
+  const u0 = USU_ST.lista.find(x => x.id === id); if (!u0) return;
+  const bloq = u0.ativo !== false;
+  if (bloq && !confirm(`Bloquear ${u0.nome}? O acesso cai na hora, inclusive se estiver usando agora.`)) return;
+  try { await usuAlterar(L => { const u = L.find(x => x.id === id); u.ativo = !bloq; u.ver = (u.ver || 0) + 1 }); toast(bloq ? 'Usuário bloqueado.' : 'Usuário desbloqueado.'); usuPreencher(false) } catch (e) { alert(e.message) }
+}
+async function usuExcluir(id) {
+  const u0 = USU_ST.lista.find(x => x.id === id); if (!u0) return;
+  if (!confirm(`Excluir o usuário ${u0.nome}? O acesso cai na hora. O registro de uso continua guardado.`)) return;
+  try { await usuAlterar(L => { const i = L.findIndex(x => x.id === id); if (i >= 0) L.splice(i, 1) }); toast('Usuário excluído.'); usuPreencher(false) } catch (e) { alert(e.message) }
+}
+async function usuRegistros(el, forcar) {
+  if (!USU_ST.reg || forcar) {
+    const todos = [];
+    for (const m of mesesAcessos(3)) { const f = await dbxBaixar(`/acesso/registros/${m}.json`); if (f) { try { todos.push(...JSON.parse(f.texto)) } catch (e) { } } }
+    USU_ST.reg = todos.sort((a, b) => String(b.em).localeCompare(String(a.em)));
+  }
+  const R = USU_ST.reg;
+  const hora = s => new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  el.innerHTML = `<div class="card"><div class="acts" style="justify-content:space-between"><span class="sub">Últimos 3 meses · ${R.length} registro(s)</span><button onclick="usuPreencher(true)">🔄 Atualizar</button></div>
+  ${R.length ? `<table style="width:100%;border-collapse:collapse">${R.slice(0, 300).map(r => `<tr style="border-top:1px solid #eee"><td style="padding:5px 4px;white-space:nowrap" class="sub">${hora(r.em)}</td><td style="padding:5px 4px"><b>${esc(r.nome || '?')}</b></td><td style="padding:5px 4px">${r.acao === 'tentativa recusada' ? '⚠️ ' : ''}${esc(r.acao)}${r.det ? ` <span class="sub">– ${esc(r.det)}</span>` : ''}</td><td class="sub" style="padding:5px 4px">${esc(r.disp || '')}</td></tr>`).join('')}</table>` : '<div class="empty">Nenhum registro ainda.</div>'}</div>`;
+}
+if (!EQUIPE) { const i = NAV.findIndex(n => n[0] === 'config'); if (!NAV.some(n => n[0] === 'usuarios')) NAV.splice(i < 0 ? NAV.length : i, 0, ['usuarios', '🔐', 'Usuários e acessos']) }
 
 render();initDropbox();
 </script>

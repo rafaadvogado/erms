@@ -10,7 +10,9 @@
      DBX_APP_KEY  – h4lwztmql1yrikv
      ORIGENS      – https://rafaelmsouza.adv.br  (separe por vírgula se houver mais de um)
    Avisos no celular (opcional): KV namespace ligado como PUSH + gatilho Cron a cada 30 minutos.
-     GET  /push/chave  – chave pública VAPID      POST /push/assinar – {fid, sub, noticias}      POST /push/sair – {endpoint} */
+     GET  /push/chave  – chave pública VAPID      POST /push/assinar – {fid, sub, noticias}      POST /push/sair – {endpoint}
+   Acesso restrito da equipe (ERMS pelo site): rotas /acesso/* – veja o bloco "ACESSO RESTRITO" no fim deste arquivo.
+     Precisa de um KV namespace ligado como ACESSO (ou usa o mesmo PUSH, se já existir). */
 
 const TIPOS_AGENDA = ['Audiência', 'Perícia'];
 const FONTES_OK = ['DataJud', 'DJEN', 'Recorte', 'PJe'];
@@ -22,6 +24,8 @@ let TOKEN = null, DADOS = null;
 
 export default {
   async fetch(req, env, ctx) {
+    const u0 = new URL(req.url);
+    if (u0.pathname.startsWith('/acesso/')) return rotaAcesso(req, env, u0, req.headers.get('Origin') || '', ctx);   // equipe (ERMS pelo site)
     const origens = (env.ORIGENS || 'https://rafaelmsouza.adv.br').split(',').map(s => s.trim());
     const origem = req.headers.get('Origin') || '';
     const cors = { 'Access-Control-Allow-Origin': origens.includes(origem) ? origem : origens[0], 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type', 'Vary': 'Origin' };
@@ -270,4 +274,322 @@ async function rodarAvisos(env) {
     }
     cursor = lista.list_complete ? null : lista.cursor;
   } while (cursor);
+}
+
+/* ================= ACESSO RESTRITO (equipe) =================
+   ERMS pelo site, para quem NÃO tem o Dropbox do escritório: CPF + senha + código do app autenticador.
+   Usuários: Dropbox /acesso/usuarios.json (criados pelo Dr. Rafael no ERMS em "Usuários e acessos").
+   Registro de uso: Dropbox /acesso/registros/AAAA-MM.json.
+   Precisa de um KV namespace ligado como ACESSO (ou o mesmo PUSH já existente).
+   A senha nunca chega aqui: o navegador deriva uma chave (PBKDF2) e o intermediário guarda só o hash dela.
+     POST /acesso/sal      {cpf}                         → sal da senha
+     POST /acesso/ativar1  {cpf, convite}                → segredo do autenticador (QR)
+     POST /acesso/ativar2  {cpf, convite, chave, codigo} → grava senha + autenticador, devolve a sessão
+     POST /acesso/entrar   {cpf, chave, codigo}          → sessão (10 h)
+     GET  /acesso/dados                                  → dados filtrados pelas permissões
+     POST /acesso/salvar   {mudados:{col:[...]}, excluidos:{id:data}} → grava no dados.json e devolve os dados */
+const ORIGENS_ACESSO = ['https://rafaadvogado.github.io'];
+const SESSAO_H = 10;
+const COLS_EQ = ['pessoas', 'processos', 'andamentos', 'prazos', 'conversas', 'leads', 'honorarios'];
+const PROTEGIDOS = { pessoas: ['portalChave', 'senhaPortal', 'senhaInss'], processos: [] };
+let USU = null;
+
+async function rotaAcesso(req, env, url, origem, ctx) {
+  const ok = [...ORIGENS_ACESSO, ...(env.ORIGENS || 'https://rafaelmsouza.adv.br').split(',').map(s => s.trim())];
+  const cors = { 'Access-Control-Allow-Origin': ok.includes(origem) ? origem : ORIGENS_ACESSO[0], 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type, authorization', 'Access-Control-Max-Age': '86400', 'Vary': 'Origin' };
+  const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  try {
+    const KV = env.ACESSO || env.PUSH;
+    if (!KV) return json({ erro: 'Acesso restrito ainda não configurado no intermediário (falta ligar o KV "ACESSO").' }, 503);
+    if (req.method === 'POST' && !ok.includes(origem)) return json({ erro: 'origem não permitida' }, 403);
+    const rota = url.pathname.slice(8), ip = req.headers.get('CF-Connecting-IP') || '';
+    const ctxA = { env, KV, ip, req, ctx };
+    if (req.method === 'POST' && rota === 'sal') return json(await acSal(await corpoJson(req), ctxA));
+    if (req.method === 'POST' && rota === 'ativar1') return json(await acAtivar1(await corpoJson(req), ctxA));
+    if (req.method === 'POST' && rota === 'ativar2') return json(await acAtivar2(await corpoJson(req), ctxA));
+    if (req.method === 'POST' && rota === 'entrar') return json(await acEntrar(await corpoJson(req), ctxA));
+    if (rota === 'dados' || rota === 'salvar') {
+      const u = await acSessao(req, ctxA);
+      if (req.method === 'GET' && rota === 'dados') { const d = await lerDadosRev(env); return json({ db: escopoDb(d.d, u), usuario: pubUsuario(u), em: new Date().toISOString() }) }
+      if (req.method === 'POST' && rota === 'salvar') return json(await acSalvar(await corpoJson(req, 3e6), u, ctxA));
+    }
+    return json({ erro: 'rota desconhecida' }, 404);
+  } catch (e) {
+    return json({ erro: e.message || 'erro' }, e.status || 500);
+  }
+}
+async function corpoJson(req, max = 4000) {
+  const t = await req.text();
+  if (t.length > max) throw falha('pedido grande demais', 413);
+  try { return JSON.parse(t) || {} } catch (e) { throw falha('dados inválidos') }
+}
+
+/* ---------- utilidades ---------- */
+const hex = u => [...new Uint8Array(u)].map(x => x.toString(16).padStart(2, '0')).join('');
+async function sha256hex(s) { return hex(await crypto.subtle.digest('SHA-256', typeof s === 'string' ? te(s) : s)) }
+function igual(a, b) { a = String(a); b = String(b); if (a.length !== b.length) return false; let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0 }
+async function segredo(c) {
+  if (c.env.ACESSO_SEGREDO) return ub(c.env.ACESSO_SEGREDO);
+  let s = await c.KV.get('acesso:segredo');
+  if (!s) { s = b64(crypto.getRandomValues(new Uint8Array(32))); await c.KV.put('acesso:segredo', s) }
+  return ub(s);
+}
+async function chaveAes(c) { const k = await hmac(await segredo(c), te('totp-aes')); return crypto.subtle.importKey('raw', k, 'AES-GCM', false, ['encrypt', 'decrypt']) }
+async function cifrar(c, texto) { const iv = crypto.getRandomValues(new Uint8Array(12)); const x = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await chaveAes(c), te(texto)); return b64(iv) + '.' + b64(x) }
+async function decifrar(c, s) { const [iv, x] = String(s).split('.'); return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ub(iv) }, await chaveAes(c), ub(x))) }
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function b32(u) { let bits = 0, v = 0, o = ''; for (const x of u) { v = (v << 8) | x; bits += 8; while (bits >= 5) { o += B32[(v >>> (bits - 5)) & 31]; bits -= 5 } } if (bits > 0) o += B32[(v << (5 - bits)) & 31]; return o }
+function ub32(s) { s = String(s).toUpperCase().replace(/[^A-Z2-7]/g, ''); let bits = 0, v = 0; const o = []; for (const ch of s) { v = (v << 5) | B32.indexOf(ch); bits += 5; if (bits >= 8) { o.push((v >>> (bits - 8)) & 255); bits -= 8 } } return new Uint8Array(o) }
+async function totpEm(seg, passo) {
+  const m = new Uint8Array(8); let n = passo; for (let i = 7; i >= 0; i--) { m[i] = n & 255; n = Math.floor(n / 256) }
+  const k = await crypto.subtle.importKey('raw', ub32(seg), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const h = new Uint8Array(await crypto.subtle.sign('HMAC', k, m)), o = h[19] & 15;
+  return String((((h[o] & 127) << 24) | (h[o + 1] << 16) | (h[o + 2] << 8) | h[o + 3]) % 1e6).padStart(6, '0');
+}
+/* confere o código (aceita 30 s antes/depois); devolve o passo usado ou -1 */
+async function totpConfere(seg, codigo) {
+  codigo = dig(codigo); if (codigo.length !== 6) return -1;
+  const p = Math.floor(Date.now() / 30000);
+  for (const d of [0, -1, 1]) if (igual(await totpEm(seg, p + d), codigo)) return p + d;
+  return -1;
+}
+/* limite de tentativas: 5 erros por CPF e 20 por IP a cada 15 min */
+async function bloqueado(c, cpf) {
+  const [a, b] = await Promise.all([c.KV.get('tent:' + cpf), c.KV.get('tentip:' + c.ip)]);
+  if (+(a || 0) >= 5 || +(b || 0) >= 20) throw falha('Muitas tentativas. Aguarde 15 minutos e tente de novo.', 429);
+}
+async function errou(c, cpf) {
+  const [a, b] = await Promise.all([c.KV.get('tent:' + cpf), c.KV.get('tentip:' + c.ip)]);
+  await Promise.all([c.KV.put('tent:' + cpf, String(+(a || 0) + 1), { expirationTtl: 900 }), c.KV.put('tentip:' + c.ip, String(+(b || 0) + 1), { expirationTtl: 900 })]);
+}
+
+/* ---------- Dropbox: arquivos com controle de versão ---------- */
+async function dbxLer(env, path) {
+  const r = await fetch('https://content.dropboxapi.com/2/files/download', { method: 'POST', headers: { Authorization: 'Bearer ' + await token(env), 'Dropbox-API-Arg': argHeader({ path }) } });
+  if (r.status === 409) return null;
+  if (!r.ok) throw falha('Dropbox: leitura ' + r.status, 502);
+  const meta = JSON.parse(r.headers.get('Dropbox-API-Result') || '{}');
+  return { texto: await r.text(), rev: meta.rev };
+}
+async function dbxGravar(env, path, texto, rev) {
+  const modo = rev ? { '.tag': 'update', update: rev } : { '.tag': 'add' };
+  const r = await fetch('https://content.dropboxapi.com/2/files/upload', { method: 'POST', headers: { Authorization: 'Bearer ' + await token(env), 'Content-Type': 'application/octet-stream', 'Dropbox-API-Arg': argHeader({ path, mode: modo, autorename: false, mute: true }) }, body: texto });
+  if (r.status === 409) return null;                      // outra pessoa gravou antes: ler de novo
+  if (!r.ok) throw falha('Dropbox: gravação ' + r.status, 502);
+  return (await r.json()).rev;
+}
+async function lerDadosRev(env) {
+  const f = await dbxLer(env, '/dados.json');
+  if (!f) throw falha('dados do escritório não encontrados', 502);
+  const d = JSON.parse(f.texto);
+  DADOS = { t: Date.now(), d };
+  return { d, rev: f.rev };
+}
+async function lerUsuarios(env, fresco) {
+  if (!fresco && USU && USU.t > Date.now() - 15000) return USU;
+  const f = await dbxLer(env, '/acesso/usuarios.json');
+  const j = f ? JSON.parse(f.texto) : { usuarios: [] };
+  j.usuarios = Array.isArray(j.usuarios) ? j.usuarios : [];
+  USU = { t: Date.now(), j, rev: f && f.rev };
+  return USU;
+}
+/* altera um usuário com segurança (relê se outra pessoa gravou no meio) */
+async function alterarUsuario(env, id, fn) {
+  for (let i = 0; i < 4; i++) {
+    const U = await lerUsuarios(env, true), u = U.j.usuarios.find(x => x.id === id);
+    if (!u) throw falha('usuário não encontrado', 404);
+    fn(u);
+    const rev = await dbxGravar(env, '/acesso/usuarios.json', JSON.stringify(U.j, null, 1), U.rev);
+    if (rev) { USU = { t: Date.now(), j: U.j, rev }; return u }
+  }
+  throw falha('não foi possível gravar agora; tente de novo', 503);
+}
+async function registrar(c, u, acao, det) {
+  const br = new Date(Date.now() - 3 * 3600e3).toISOString(), path = `/acesso/registros/${br.slice(0, 7)}.json`;
+  const reg = { em: new Date().toISOString(), u: u ? u.id : '', nome: u ? u.nome : '', acao, det: det || '', disp: dispositivo(c.req), ip: c.ip.replace(/[.:][0-9a-f]+$/i, '.x') };
+  for (let i = 0; i < 3; i++) {
+    const f = await dbxLer(c.env, path);
+    let L = []; if (f) { try { L = JSON.parse(f.texto) } catch (e) { L = [] } }
+    L.push(reg); if (L.length > 8000) L = L.slice(-8000);
+    if (await dbxGravar(c.env, path, JSON.stringify(L), f && f.rev)) return;
+  }
+}
+const depois = (c, p) => { const q = Promise.resolve(p).catch(() => { }); if (c.ctx) c.ctx.waitUntil(q); return q };
+
+/* ---------- usuários ---------- */
+async function acharUsuario(c, cpf) {
+  cpf = dig(cpf); if (!cpfValido(cpf)) throw falha('CPF inválido');
+  const U = await lerUsuarios(c.env);
+  return U.j.usuarios.find(x => dig(x.cpf) === cpf) || null;
+}
+const pubUsuario = u => ({ id: u.id, nome: u.nome, perfil: u.perfil || 'restrito', honorarios: !!u.honorarios, leads: !!u.leads, excluir: u.perfil === 'total' });
+async function salFalso(c, cpf) { return b64u((await hmac(await segredo(c), te('sal:' + cpf))).slice(0, 16)) }
+async function acSal(b, c) {
+  const cpf = dig(b.cpf), u = await acharUsuario(c, cpf);
+  return { sal: u && u.sal && u.ativo !== false ? u.sal : await salFalso(c, cpf) };
+}
+async function conviteOk(c, u, convite) {
+  if (!u || u.ativo === false || !u.convite || !u.convite.hash) return false;
+  if (u.convite.exp && u.convite.exp < new Date().toISOString()) return false;
+  return igual(u.convite.hash, await sha256hex(String(convite || '').toUpperCase().replace(/[^A-Z0-9]/g, '')));
+}
+async function acAtivar1(b, c) {
+  const cpf = dig(b.cpf); await bloqueado(c, cpf);
+  const u = await acharUsuario(c, cpf);
+  if (!(await conviteOk(c, u, b.convite))) { await errou(c, cpf); throw falha('CPF ou código de convite não conferem (ou o convite venceu).', 401) }
+  const seg = b32(crypto.getRandomValues(new Uint8Array(20))), sal = b64u(crypto.getRandomValues(new Uint8Array(16)));
+  await c.KV.put('pend:' + u.id, JSON.stringify({ seg, sal }), { expirationTtl: 1800 });
+  const rot = encodeURIComponent('ERMS:' + u.nome.split(' ')[0] + ' ' + cpf.slice(-4));
+  return { sal, segredo: seg, otpauth: `otpauth://totp/${rot}?secret=${seg}&issuer=ERMS&algorithm=SHA1&digits=6&period=30`, nome: u.nome };
+}
+async function acAtivar2(b, c) {
+  const cpf = dig(b.cpf); await bloqueado(c, cpf);
+  const u = await acharUsuario(c, cpf);
+  if (!(await conviteOk(c, u, b.convite))) { await errou(c, cpf); throw falha('CPF ou código de convite não conferem (ou o convite venceu).', 401) }
+  const pend = JSON.parse(await c.KV.get('pend:' + u.id) || 'null');
+  if (!pend) throw falha('O tempo para concluir passou. Comece o primeiro acesso de novo.', 410);
+  if (!/^[A-Za-z0-9_-]{43}$/.test(b.chave || '')) throw falha('senha inválida');
+  const passo = await totpConfere(pend.seg, b.codigo);
+  if (passo < 0) { await errou(c, cpf); throw falha('Código do autenticador não confere. Confira a hora do celular e use o código que está aparecendo agora.', 401) }
+  const chaveHash = await sha256hex(b.chave), totp = { c: await cifrar(c, pend.seg), ult: passo };
+  const novo = await alterarUsuario(c.env, u.id, x => { x.sal = pend.sal; x.chaveHash = chaveHash; x.totp = totp; x.convite = null; x.ver = (x.ver || 0) + 1; x.ativadoEm = new Date().toISOString() });
+  await c.KV.delete('pend:' + u.id);
+  depois(c, registrar(c, novo, 'primeiro acesso', 'senha e autenticador cadastrados'));
+  return { token: await emitirSessao(c, novo), usuario: pubUsuario(novo) };
+}
+async function acEntrar(b, c) {
+  const cpf = dig(b.cpf); await bloqueado(c, cpf);
+  const u = await acharUsuario(c, cpf);
+  const falhou = async (msg = 'CPF, senha ou código não conferem.') => { await errou(c, cpf); if (u) depois(c, registrar(c, u, 'tentativa recusada', msg)); throw falha(msg, 401) };
+  if (!u || u.ativo === false || !u.chaveHash || !u.totp) { await sha256hex(String(b.chave || '')); return falhou() }
+  if (!igual(u.chaveHash, await sha256hex(String(b.chave || '')))) return falhou();
+  let seg; try { seg = await decifrar(c, u.totp.c) } catch (e) { return falhou('Autenticador precisa ser cadastrado de novo. Peça ao Dr. Rafael um novo convite.') }
+  const passo = await totpConfere(seg, b.codigo);
+  if (passo < 0) return falhou();
+  const ult = +(await c.KV.get('totp:' + u.id) || u.totp.ult || 0);
+  if (passo <= ult) return falhou('Este código já foi usado. Aguarde o próximo código do autenticador.');
+  await c.KV.put('totp:' + u.id, String(passo), { expirationTtl: 3600 });
+  await c.KV.delete('tent:' + cpf);
+  depois(c, registrar(c, u, 'entrou'));
+  return { token: await emitirSessao(c, u), usuario: pubUsuario(u) };
+}
+async function emitirSessao(c, u) {
+  const p = b64u(te(JSON.stringify({ u: u.id, v: u.ver || 0, exp: Date.now() + SESSAO_H * 3600e3 })));
+  return p + '.' + b64u(await hmac(await segredo(c), te('sessao.' + p)));
+}
+async function acSessao(req, c) {
+  const t = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  const [p, s] = t.split('.');
+  const sair = () => { throw falha('Sessão encerrada. Entre de novo.', 401) };
+  if (!p || !s || !igual(s, b64u(await hmac(await segredo(c), te('sessao.' + p))))) sair();
+  let o; try { o = JSON.parse(new TextDecoder().decode(ub64u(p))) } catch (e) { sair() }
+  if (!o.exp || o.exp < Date.now()) sair();
+  const U = await lerUsuarios(c.env), u = U.j.usuarios.find(x => x.id === o.u);
+  if (!u || u.ativo === false || (u.ver || 0) !== o.v) sair();
+  return u;
+}
+
+/* ---------- o que cada usuário enxerga ---------- */
+function alcance(d, u) {
+  const exc = d.excluidos || {}, vivo = x => x && x.id && !exc[x.id];
+  const total = u.perfil === 'total';
+  const cols = { pessoas: 1, processos: 1, andamentos: 1, prazos: 1, conversas: 1, leads: !!u.leads, honorarios: !!u.honorarios };
+  if (total) return { total, cols, vivo, ve: () => true };
+  const extra = new Set(u.processos || []), resp = String(u.responsavel || '').trim();
+  const procs = new Set((d.processos || []).filter(p => vivo(p) && ((resp && p.responsavel === resp) || extra.has(p.id) || p.criadoPor === u.id)).map(p => p.id));
+  const clientes = new Set(), pessoas = new Set();
+  (d.processos || []).forEach(p => {
+    if (!procs.has(p.id)) return;
+    [p.clienteId, ...(p.outrosClientes || [])].forEach(x => { if (x) { clientes.add(x); pessoas.add(x) } });
+    [p.contrariaId, ...(p.observadores || [])].forEach(x => x && pessoas.add(x));
+  });
+  (d.pessoas || []).forEach(p => { if (p.criadoPor === u.id) { pessoas.add(p.id); clientes.add(p.id) } });
+  const ve = (col, r) => {
+    if (r.criadoPor === u.id) return true;
+    if (col === 'processos') return procs.has(r.id);
+    if (col === 'pessoas') return pessoas.has(r.id);
+    if (col === 'leads') return true;
+    if (r.processoId) return procs.has(r.processoId);
+    if (r.pessoaId) return clientes.has(r.pessoaId);
+    if (col === 'conversas' && r.leadId) return !!u.leads;
+    return false;
+  };
+  return { total, cols, vivo, ve, procs, pessoas };
+}
+function limparRegistro(col, r) {
+  const x = { ...r };
+  (PROTEGIDOS[col] || []).forEach(k => delete x[k]);
+  return x;
+}
+function escopoDb(d, u) {
+  const A = alcance(d, u), r = { excluidos: {}, config: { seedVer: (d.config || {}).seedVer || 99, criado: (d.config || {}).criado || '' } };
+  COLS_EQ.forEach(c => { r[c] = A.cols[c] ? (d[c] || []).filter(x => A.vivo(x) && A.ve(c, x)).map(x => limparRegistro(c, x)) : [] });
+  r.portal = [];
+  return r;
+}
+
+/* ---------- gravação ---------- */
+async function acSalvar(b, u, c) {
+  const mud = b.mudados || {}, exc = b.excluidos || {};
+  let n = 0, rec = 0, apag = 0;
+  for (let tent = 0; tent < 4; tent++) {
+    const { d, rev } = await lerDadosRev(c.env);
+    COLS_EQ.forEach(col => d[col] = Array.isArray(d[col]) ? d[col] : []);
+    d.excluidos = d.excluidos || {};
+    const A = alcance(d, u), agora = new Date().toISOString();
+    n = 0; rec = 0; apag = 0;
+    const novosProc = new Set();
+    // primeiro os processos novos (para andamentos/prazos do mesmo envio poderem se ligar a eles)
+    const ordem = ['pessoas', 'processos', 'andamentos', 'prazos', 'conversas', 'leads', 'honorarios'];
+    for (const col of ordem) {
+      const lista = Array.isArray(mud[col]) ? mud[col] : [];
+      if (!lista.length) continue;
+      if (!A.cols[col]) { rec += lista.length; continue }
+      const idx = new Map(d[col].map((x, i) => [x.id, i]));
+      for (const x0 of lista) {
+        if (!x0 || typeof x0 !== 'object' || !/^[A-Za-z0-9_.:-]{1,60}$/.test(String(x0.id || ''))) { rec++; continue }
+        const i = idx.get(x0.id), atual = i === undefined ? null : d[col][i];
+        if (d.excluidos[x0.id]) { rec++; continue }
+        const x = { ...x0 }; delete x._m; delete x._por;
+        (PROTEGIDOS[col] || []).forEach(k => delete x[k]);
+        if (atual) {
+          if (!A.ve(col, atual)) { rec++; continue }
+          (PROTEGIDOS[col] || []).forEach(k => { if (k in atual) x[k] = atual[k] });
+          if (!A.total && col === 'processos') x.responsavel = atual.responsavel;
+          if (atual.criadoPor) x.criadoPor = atual.criadoPor; else delete x.criadoPor;
+          if (!A.total && x.processoId !== atual.processoId && x.processoId && !A.procs.has(x.processoId) && !novosProc.has(x.processoId)) x.processoId = atual.processoId;
+          d[col][i] = { ...x, _m: agora, _por: u.nome };
+        } else {
+          if (!A.total) {
+            if (col === 'processos') { if (u.responsavel) x.responsavel = u.responsavel; novosProc.add(x.id) }
+            if (x.processoId && !A.procs.has(x.processoId) && !novosProc.has(x.processoId)) { rec++; continue }
+          }
+          x.criadoPor = u.id;
+          d[col].push({ ...x, criado: x.criado || agora, _m: agora, _por: u.nome });
+          idx.set(x.id, d[col].length - 1);
+          if (col === 'processos') A.procs && A.procs.add(x.id);
+        }
+        n++;
+      }
+    }
+    for (const [id, t] of Object.entries(exc)) {
+      for (const col of COLS_EQ) {
+        const i = d[col].findIndex(x => x.id === id); if (i < 0) continue;
+        const r = d[col][i];
+        if (!A.cols[col] || !A.ve(col, r) || !(A.total || r.criadoPor === u.id)) { rec++; break }
+        d[col].splice(i, 1); d.excluidos[id] = agora; apag++; break;
+      }
+    }
+    if (!n && !apag) return { db: escopoDb(d, u), gravados: 0, recusados: rec };
+    d.config = d.config || {}; d.config.alterado = agora;
+    const texto = JSON.stringify(d);
+    if (texto.length < 1000) throw falha('gravação recusada (dados vazios)', 500);
+    const novoRev = await dbxGravar(c.env, '/dados.json', texto, rev);
+    if (!novoRev) continue;                                // conflito: alguém gravou antes — refaz
+    DADOS = { t: Date.now(), d };
+    depois(c, registrar(c, u, 'alterou', `${n} registro(s)${apag ? `, ${apag} excluído(s)` : ''}`));
+    return { db: escopoDb(d, u), gravados: n, excluidos: apag, recusados: rec };
+  }
+  throw falha('O sistema está ocupado gravando outra alteração. Tente de novo em instantes.', 503);
 }
