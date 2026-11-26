@@ -243,7 +243,7 @@ const waLink=t=>{let d=String(t||'').replace(/\D/g,'');if(!d)return'';if(d.lengt
 
 /* ---------- dados ---------- */
 function blank(){const d={config:{}};COLS.forEach(c=>d[c]=[]);return d}
-function fixDb(d){d=d||{};COLS.forEach(c=>d[c]=Array.isArray(d[c])?d[c]:[]);d.config=d.config||{};d.honorarios.forEach(h=>{if(h.forma==='Alvará / RPV'||h.forma==='Precatório'||h.forma==='RPV'){h.forma='RPV / Precatório';h._m=new Date().toISOString()}});d.processos.forEach(p=>{if(!p._resp1&&String(p.criado||'')<'2026-11-09T13:00'){p._resp1=1;if(p.responsavel!=='Rafael de Mello Souza'){p.responsavel='Rafael de Mello Souza';p._m=new Date().toISOString()}}});return d}
+function fixDb(d){d=d||{};COLS.forEach(c=>d[c]=Array.isArray(d[c])?d[c]:[]);d.config=d.config||{};d.honorarios.forEach(h=>{if(h.forma==='Alvará / RPV'||h.forma==='Precatório'||h.forma==='RPV'){h.forma='RPV / Precatório'}});d.processos.forEach(p=>{if(!p._resp1&&String(p.criado||'')<'2026-11-09T13:00'){p._resp1=1;if(p.responsavel!=='Rafael de Mello Souza'){p.responsavel='Rafael de Mello Souza'}}});return d}
 
 const ADD=JSON.parse(document.getElementById('rms-add').textContent);const SEED_VER=Math.max(2,...ADD.map(a=>a.v));
 function applyAdd(d,v0){for(const A of ADD){if(v0>=A.v)continue;const has=c=>new Set(d[c].map(x=>x.id));
@@ -941,7 +941,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 26/11 12:24 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 26/11 14:03 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
