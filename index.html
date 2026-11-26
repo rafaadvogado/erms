@@ -468,8 +468,8 @@ VIEWS.painel=()=>{
  h+=backupBanner();
  h+=`<div class="stats"><div class="stat" onclick="go('processos')"><b>${ativos}</b><span>Processos ativos</span></div><div class="stat ${db.prazos.some(p=>!p.feito&&p.data<t)?'bad':''}" onclick="go('prazos')"><b>${db.prazos.filter(p=>!p.feito&&p.data<=w).length}</b><span>Prazos até 7 dias</span></div><div class="stat ${rtAll.some(c=>c.retorno<t)?'bad':''}" onclick="st.cr='p';go('conversas')"><b>${rtAll.length}</b><span>Retornos a clientes</span></div><div class="stat" onclick="go('leads')"><b>${db.leads.filter(aberto).length}</b><span>Leads em aberto</span></div><div class="stat ok" onclick="go('honorarios')"><b>${money(sum(recMes))}</b><span>Recebido no mês</span></div><div class="stat ${atras.length?'bad':''}" onclick="st.hs='atr';go('honorarios')"><b>${money(sum(atras))}</b><span>Honorários em atraso</span></div></div>`;
  h+=`<div class="cols"><div class="card"><h2>📅 Prazos e compromissos (atrasados e próximos 7 dias)</h2>${pz.map(prazoItem).join('')||'<div class="empty">Nada pendente nos próximos 7 dias.</div>'}</div><div class="card"><h2>📞 Retornos prometidos a clientes</h2>${rt.map(retornoItem).join('')||'<div class="empty">Nenhum retorno pendente. Ao registrar uma conversa, informe "Retornar ao cliente em" e ela aparece aqui.</div>'}</div></div>`;
- h+=`<div class="cols"><div class="card"><h2>🎯 Leads para contatar</h2>${ld.map(l=>`<div class="item ${dueClass(l.proximoContato)}" style="cursor:pointer" onclick="verLead('${l.id}')"><div class="grow"><b>${esc(l.nome)}</b> <span class="tag">${esc(l.etapa||'Novo')}</span><div class="sub">${esc(l.assunto||'')}</div></div><span class="rel">${rel(l.proximoContato)}</span></div>`).join('')||'<div class="empty">Nenhum lead com contato marcado para esta semana.</div>'}</div><div class="card"><h2>✅ Últimos prazos e tarefas cumpridos</h2>${feitosRec().map(z=>`<div class="item"><div style="min-width:82px"><b>${fd(z.data)}</b><div class="sub">${esc(z.tipo||'')}</div></div><div class="grow">${esc(z.titulo||'')}${z.processoId||z.pessoaId?`<div class="sub">${z.processoId?`<a href="#processo/${z.processoId}">${esc(numProc(z.processoId))}</a> · `:''}${z.pessoaId?esc(nomeP(z.pessoaId)):''}</div>`:''}<div class="sub">cumprido em ${fdt(z.feitoEm||z._m||'')}</div></div><button onclick="toggle('prazos','${z.id}','feito')" title="Voltar para pendente">↺ Desfazer</button></div>`).join('')||'<div class="empty">Nenhum prazo ou tarefa cumprido ainda.</div>'}</div></div></div>`;
- h+=`<div class="cols"><div class="card"><h2>⚖️ Movimentações dos últimos 7 dias</h2>${novid.map(a=>{const p=byId('processos',a.processoId);return p?`<div class="item"><div style="min-width:82px"><b>${fd(a.data)}</b></div><div class="grow"><a href="#processo/${p.id}"><b>${esc(nomeP(p.clienteId))}</b></a> <span class="sub">${esc(p.numero)}</span><div>${esc(a.descricao)}</div></div></div>`:''}).join('')||'<div class="empty">Sem movimentações registradas nos últimos 7 dias.</div>'}</div><div class="card"><h2>💰 Honorários: atrasados e próximos 30 dias</h2>${[...atras,...prox].sort(by('vencimento')).map(x=>`<div class="item ${dueClass(x.vencimento)}"><div class="grow"><a href="#pessoa/${x.pessoaId}"><b>${esc(nomeP(x.pessoaId))}</b></a> — ${esc(x.descricao||x.tipo||'')}<div class="sub">vence ${fd(x.vencimento)} (${rel(x.vencimento)})</div></div><b class="money">${money(x.valor)}</b><button onclick="receber('${x.id}')">Receber</button></div>`).join('')||'<div class="empty">Nada a receber nos próximos 30 dias.</div>'}</div></div>`;
+ h+=`<div class="cols"><div class="card"><h2>🎯 Leads para contatar</h2>${ld.map(l=>`<div class="item ${dueClass(l.proximoContato)}" style="cursor:pointer" onclick="verLead('${l.id}')"><div class="grow"><b>${esc(l.nome)}</b> <span class="tag">${esc(l.etapa||'Novo')}</span><div class="sub">${esc(l.assunto||'')}</div></div><span class="rel">${rel(l.proximoContato)}</span></div>`).join('')||'<div class="empty">Nenhum lead com contato marcado para esta semana.</div>'}</div><div class="card"><h2>✅ Últimos prazos e tarefas cumpridos</h2>${feitosRec().slice(0,5).map(z=>`<div class="item"><div style="min-width:82px"><b>${fd(z.data)}</b><div class="sub">${esc(z.tipo||'')}</div></div><div class="grow">${esc(z.titulo||'')}${z.processoId||z.pessoaId?`<div class="sub">${z.processoId?`<a href="#processo/${z.processoId}">${esc(numProc(z.processoId))}</a> · `:''}${z.pessoaId?esc(nomeP(z.pessoaId)):''}</div>`:''}<div class="sub">cumprido em ${fdt(z.feitoEm||z._m||'')}</div></div><button onclick="toggle('prazos','${z.id}','feito')" title="Voltar para pendente">↺ Desfazer</button></div>`).join('')||'<div class="empty">Nenhum prazo ou tarefa cumprido ainda.</div>'}${db.prazos.some(z=>z.feito)?`<a class="vermais" href="#prazos" onclick="st.zs='feitos'">Ver todos os cumpridos (${db.prazos.filter(z=>z.feito).length}) →</a>`:''}</div></div></div>`;
+ h+=`<div class="cols"><div class="card"><h2>⚖️ Movimentações dos últimos 7 dias</h2>${novid.filter(a=>byId('processos',a.processoId)).slice(0,5).map(a=>{const p=byId('processos',a.processoId);return p?`<div class="item"><div style="min-width:82px"><b>${fd(a.data)}</b></div><div class="grow"><a href="#processo/${p.id}"><b>${esc(nomeP(p.clienteId))}</b></a> <span class="sub">${esc(p.numero)}</span><div>${esc(a.descricao)}</div></div></div>`:''}).join('')||'<div class="empty">Sem movimentações registradas nos últimos 7 dias.</div>'}<a class="vermais" href="#movimentacoes">Ver todas as movimentações (${novid.filter(a=>byId('processos',a.processoId)).length} nos últimos 7 dias) →</a></div><div class="card"><h2>💰 Honorários: atrasados e próximos 30 dias</h2>${[...atras,...prox].sort(by('vencimento')).map(x=>`<div class="item ${dueClass(x.vencimento)}"><div class="grow"><a href="#pessoa/${x.pessoaId}"><b>${esc(nomeP(x.pessoaId))}</b></a> — ${esc(x.descricao||x.tipo||'')}<div class="sub">vence ${fd(x.vencimento)} (${rel(x.vencimento)})</div></div><b class="money">${money(x.valor)}</b><button onclick="receber('${x.id}')">Receber</button></div>`).join('')||'<div class="empty">Nada a receber nos próximos 30 dias.</div>'}</div></div>`;
  return h};
 
 /* ---------- CONVERSAS ---------- */
@@ -941,7 +941,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 26/11 09:36 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 26/11 09:46 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1812,14 +1812,14 @@ function julgItem(p) {
 }
 (function () {
   const css = document.createElement('style');
-  css.textContent = '.tag.jg{background:#efe3c2;color:#6b4c00;border:1px solid #d9c38a}.card.jgcard{border-left:4px solid #b8892b}.card.jgcard h2 .sub{font-weight:400}';
+  css.textContent = '.tag.jg{background:#efe3c2;color:#6b4c00;border:1px solid #d9c38a}.card.jgcard{border-left:4px solid #b8892b}.card.jgcard h2 .sub{font-weight:400}.vermais{display:block;margin-top:10px;padding-top:10px;border-top:1px solid var(--line,#e3dccb);font-weight:600;text-decoration:none}.vermais:hover{text-decoration:underline}';
   document.head.appendChild(css);
 })();
 const _painelJulg = VIEWS.painel;
 VIEWS.painel = a => {
   const h = _painelJulg(a), L = julgLista();
   if (!L.length) return h;
-  const card = `<div class="card jgcard"><h2>⚖️ Aguardando julgamento (${L.length}) <span class="sub">– em pauta ou conclusos para julgamento/sentença</span></h2>${L.map(julgItem).join('')}</div>`;
+  const card = `<div class="card jgcard"><h2>⚖️ Aguardando julgamento (${L.length}) <span class="sub">– em pauta ou conclusos para julgamento/sentença</span></h2>${L.slice(0, 5).map(julgItem).join('')}${L.length > 5 ? `<a class="vermais" href="#processos" onclick="st.ps='julg'">Ver todos os ${L.length} aguardando julgamento/sentença →</a>` : ''}</div>`;
   const i = h.indexOf('<div class="cols">');
   return i < 0 ? h + card : h.slice(0, i) + card + h.slice(i);
 };
@@ -1869,6 +1869,19 @@ function julgTirar(id) {
   if (bloqueado()) return; const p = byId('processos', id); if (!p) return;
   if (!confirm('Tirar este processo do quadro "Aguardando julgamento"?')) return;
   delete p.julgamento; p._m = new Date().toISOString(); save(); render(); toast('Processo tirado do quadro.');
+}
+
+/* ---------- MOVIMENTAÇÕES (todas) – acesso pelo Painel ---------- */
+VIEWS.movimentacoes = () => {
+  if (st.mvd == null) st.mvd = '7';
+  return `<div class="top"><div><div class="sub"><a href="#painel">← Painel</a></div><h1>Movimentações</h1><div class="sub">Andamentos registrados nos processos, do mais recente para o mais antigo.</div></div></div>
+  <div class="filters"><input type="search" placeholder="Buscar cliente, nº do processo ou texto…" value="${esc(st.mvq || '')}" oninput="st.mvq=this.value;upd(lMovimentacoes)"><select onchange="st.mvd=this.value;upd(lMovimentacoes)">${opt('7', st.mvd, 'Últimos 7 dias')}${opt('30', st.mvd, 'Últimos 30 dias')}${opt('90', st.mvd, 'Últimos 90 dias')}${opt('todos', st.mvd, 'Todo o período')}</select></div><div id="lst">${lMovimentacoes()}</div>`;
+};
+function lMovimentacoes() {
+  const q = norm(st.mvq || ''), lim = st.mvd === 'todos' ? '' : addDays(todayStr(), -Number(st.mvd || 7));
+  const a = db.andamentos.filter(x => (!lim || x.data >= lim) && byId('processos', x.processoId)).filter(x => { if (!q) return true; const p = byId('processos', x.processoId); return norm([x.descricao, x.fonte, p.numero, nomeP(p.clienteId)].join(' ')).includes(q) }).sort(by('data', 'criado')).reverse();
+  if (!a.length) return '<div class="empty">Nenhuma movimentação no período.</div>';
+  return `<div class="sub" style="margin-bottom:6px">${a.length} movimentação(ões)${a.length > 300 ? ' – mostrando 300' : ''}</div><div class="card">` + a.slice(0, 300).map(x => { const p = byId('processos', x.processoId); return `<div class="item"><div style="min-width:82px"><b>${fd(x.data)}</b></div><div class="grow"><a href="#processo/${p.id}"><b>${esc(nomeP(p.clienteId))}</b></a> <span class="sub">${esc(p.numero || '')}</span><div style="white-space:pre-wrap">${esc(x.descricao)}</div>${x.fonte ? `<div class="sub">${esc(x.fonte)}</div>` : ''}</div></div>` }).join('') + '</div>';
 }
 
 render();initDropbox();
