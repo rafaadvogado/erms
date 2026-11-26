@@ -941,7 +941,7 @@ VIEWS.config = () => `<div class="top"><div><h1>Backup e ajustes</h1><div class=
 <p class="sub">Restaurar substitui os dados em todos os aparelhos. Use só se precisar voltar a uma cópia anterior.</p></div>
 <div class="card"><h2>Planilhas (Excel)</h2><div class="acts">${['processos', 'pessoas', 'conversas', 'prazos', 'leads', 'honorarios'].map(c => `<button onclick="csv('${c}')">⬇ ${c[0].toUpperCase() + c.slice(1)}</button>`).join('')}</div></div>
 <div class="card"><h2>Instalar o app</h2><p class="sub"><b>Windows:</b> no Chrome ou Edge, clique no ícone de instalar na barra de endereço (ou menu ⋮ → "Instalar ERMS").<br><b>iPhone:</b> no Safari, toque em Compartilhar → "Adicionar à Tela de Início".</p></div>
-<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 16/11 11:01 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
+<div class="card"><h2>Este aparelho</h2><p class="sub">Versão do app: 26/11 09:25 · ERMS – sistema desenvolvido por Rafael de Mello Souza</p><button class="danger" onclick="apagarTudo()">Limpar os dados deste aparelho e baixar de novo do Dropbox</button></div>`;
 importar = function (f) {
   if (!f) return; const r = new FileReader();
   r.onload = () => {
@@ -1785,6 +1785,88 @@ function trocarEmojis(raiz) {
     .observe(document.body, { childList: true, subtree: true, characterData: true });
   marcar(document.body);
 })();
+
+/* ---------- AGUARDANDO JULGAMENTO (26/11/2026) ----------
+   Campo no processo: p.julgamento = { fase: 'pauta'|'concluso', orgao, inicio: 'AAAA-MM-DD', fim: 'AAAA-MM-DD', hora, desde, obs }
+   Ausente = processo não está aguardando julgamento. Painel mostra o quadro "⚖️ Aguardando julgamento";
+   Processos ganham selo e filtro; a ficha do processo ganha o botão para marcar/editar/tirar. */
+const julgAtivo = p => !!(p && p.julgamento && procAtivo(p));
+const julgLista = () => db.processos.filter(julgAtivo).sort((a, b) => ((a.julgamento.inicio || '9') + (a.julgamento.desde || '')).localeCompare((b.julgamento.inicio || '9') + (b.julgamento.desde || '')));
+function julgStatus(j) {
+  const t = todayStr();
+  if (j.inicio) {
+    const per = j.fim && j.fim !== j.inicio ? `${fd(j.inicio)} a ${fd(j.fim)}` : fd(j.inicio);
+    if (j.fim && j.fim < t) return { cls: 'bad', txt: `Sessão ${per} – terminou; aguardando o resultado` };
+    if (!j.fim && j.inicio < t) return { cls: 'bad', txt: `Sessão em ${per} – aguardando o resultado` };
+    if (j.inicio <= t) return { cls: 'warn', txt: `Em julgamento agora (sessão ${per})` };
+    return { cls: '', txt: `Sessão ${per}${j.hora ? ' · ' + esc(j.hora) : ''} · ${rel(j.inicio)}` };
+  }
+  return { cls: '', txt: (j.fase === 'concluso' ? 'Concluso para julgamento' : 'Incluído em pauta') + (j.desde ? ` desde ${fd(j.desde)}` : '') };
+}
+function julgItem(p) {
+  const j = p.julgamento, s = julgStatus(j);
+  return `<div class="item ${s.cls === 'bad' ? 'late' : s.cls === 'warn' ? 'soon' : ''}" style="cursor:pointer" onclick="go('processo/${p.id}')"><div class="grow"><b>${esc(nomeP(p.clienteId))}</b> <span class="tag jg">⚖️ ${j.fase === 'concluso' ? 'Concluso' : 'Em pauta'}</span><div class="sub">${esc(p.numero || '')}${j.orgao ? ' · ' + esc(j.orgao) : ''}</div><div>${s.txt}</div>${j.obs ? `<div class="sub">${esc(j.obs)}</div>` : ''}</div></div>`;
+}
+(function () {
+  const css = document.createElement('style');
+  css.textContent = '.tag.jg{background:#efe3c2;color:#6b4c00;border:1px solid #d9c38a}.card.jgcard{border-left:4px solid #b8892b}.card.jgcard h2 .sub{font-weight:400}';
+  document.head.appendChild(css);
+})();
+const _painelJulg = VIEWS.painel;
+VIEWS.painel = a => {
+  const h = _painelJulg(a), L = julgLista();
+  if (!L.length) return h;
+  const card = `<div class="card jgcard"><h2>⚖️ Aguardando julgamento (${L.length}) <span class="sub">– processos incluídos em pauta</span></h2>${L.map(julgItem).join('')}</div>`;
+  const i = h.indexOf('<div class="cols">');
+  return i < 0 ? h + card : h.slice(0, i) + card + h.slice(i);
+};
+const _vProcessosJulg = VIEWS.processos;
+VIEWS.processos = a => _vProcessosJulg(a).replace(`${opt('parece', st.ps, '⚠ Ativos que parecem encerrados')}`, `${opt('parece', st.ps, '⚠ Ativos que parecem encerrados')}${opt('julg', st.ps, '⚖️ Aguardando julgamento (' + julgLista().length + ')')}`);
+const _lProcessosJulg = lProcessos;
+lProcessos = function () {
+  let h;
+  if (st.ps === 'julg') {
+    const keep = db.processos; db.processos = julgLista(); st.ps = 'todos';
+    try { h = _lProcessosJulg() } finally { db.processos = keep; st.ps = 'julg' }
+  } else h = _lProcessosJulg();
+  return h.replace(/(onclick="go\('processo\/([^']+)'\)"><div class="grow"><b>[^<]*<\/b>)/g, (m, pre, id) => julgAtivo(byId('processos', id)) ? pre + ' <span class="tag jg">⚖️ Aguardando julgamento</span>' : m);
+};
+const _vProcessoJulg = VIEWS.processo;
+VIEWS.processo = id => {
+  let h = _vProcessoJulg(id); const p = byId('processos', id);
+  if (!p) return h;
+  const box = p.julgamento
+    ? `<div class="banner" style="border-left:4px solid #b8892b">⚖️ <b>Aguardando julgamento</b>${p.julgamento.orgao ? ' – ' + esc(p.julgamento.orgao) : ''}: ${julgStatus(p.julgamento).txt}${p.julgamento.obs ? ` <span class="sub">· ${esc(p.julgamento.obs)}</span>` : ''} <button onclick="julgEditar('${id}')">✎ Editar</button><button onclick="julgTirar('${id}')">✓ Julgado / tirar do quadro</button></div>`
+    : `<div class="noprint" style="margin:-4px 0 10px"><button onclick="julgEditar('${id}')">⚖️ Marcar como aguardando julgamento</button></div>`;
+  const i = h.indexOf('<div class="card"><dl class="info">');
+  return i < 0 ? h + box : h.slice(0, i) + box + h.slice(i);
+};
+function julgEditar(id) {
+  if (bloqueado()) return; const p = byId('processos', id); if (!p) return;
+  const j = p.julgamento || { fase: 'pauta', desde: todayStr() };
+  showModal(`<div class="mbox"><div class="mhead"><h3>⚖️ Aguardando julgamento</h3><button class="x" onclick="closeModal()">×</button></div>
+  <form class="grid" onsubmit="event.preventDefault();julgSalvar('${id}',this)">
+  <label>Fase<select name="fase">${opt('pauta', j.fase, 'Incluído em pauta')}${opt('concluso', j.fase, 'Concluso para julgamento (sem data)')}</select></label>
+  <label>Órgão julgador<input name="orgao" value="${esc(j.orgao || '')}" placeholder="ex.: 6ª Turma Recursal de SP"></label>
+  <label>Início da sessão<input type="date" name="inicio" value="${esc(j.inicio || '')}"></label>
+  <label>Fim da sessão (virtual)<input type="date" name="fim" value="${esc(j.fim || '')}"></label>
+  <label>Horário<input name="hora" value="${esc(j.hora || '')}" placeholder="ex.: 14h às 18h"></label>
+  <label>Aguardando desde<input type="date" name="desde" value="${esc(j.desde || '')}"></label>
+  <label class="full">Observação<input name="obs" value="${esc(j.obs || '')}" placeholder="ex.: sessão virtual; sustentação oral até 48 h antes"></label>
+  <div class="mfoot full"><button type="button" onclick="closeModal()">Cancelar</button><button class="pri" type="submit">Salvar</button></div></form></div>`);
+}
+function julgSalvar(id, f) {
+  const p = byId('processos', id); if (!p) return;
+  const v = k => (f.elements[k].value || '').trim();
+  p.julgamento = { fase: v('fase'), orgao: v('orgao'), inicio: v('inicio'), fim: v('fim'), hora: v('hora'), desde: v('desde'), obs: v('obs') };
+  Object.keys(p.julgamento).forEach(k => { if (!p.julgamento[k]) delete p.julgamento[k] });
+  p._m = new Date().toISOString(); save(); closeModal(); render(); toast('Marcado como aguardando julgamento.');
+}
+function julgTirar(id) {
+  if (bloqueado()) return; const p = byId('processos', id); if (!p) return;
+  if (!confirm('Tirar este processo do quadro "Aguardando julgamento"?')) return;
+  delete p.julgamento; p._m = new Date().toISOString(); save(); render(); toast('Processo tirado do quadro.');
+}
 
 render();initDropbox();
 </script>
